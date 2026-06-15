@@ -16,8 +16,12 @@ export function createManualFields({ startedAt, endedAt, paidValue = '', notes =
 }
 
 export function createHistoryEntry({ installedAt, endedAt, duration, paidValue = '', notes = '' }) {
+  const uniqueSuffix = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+
   return {
-    id: `${endedAt}-${installedAt}-${duration}`,
+    id: `${endedAt}-${installedAt}-${duration}-${uniqueSuffix}`,
     installedAt,
     endedAt,
     duration,
@@ -27,6 +31,8 @@ export function createHistoryEntry({ installedAt, endedAt, duration, paidValue =
 }
 
 export function normalizeHistory(history = []) {
+  const usedIds = new Set()
+
   return history
     .map((entry, index) => {
       if (typeof entry === 'number') {
@@ -39,8 +45,12 @@ export function normalizeHistory(history = []) {
 
       if (!entry || typeof entry !== 'object') return null
 
+      const baseId = entry.id || `${entry.endedAt || 'sem-data'}-${entry.installedAt || 'sem-inicio'}-${entry.duration || 0}`
+      const id = usedIds.has(baseId) ? `${baseId}-${index}` : baseId
+      usedIds.add(id)
+
       return {
-        id: entry.id || `${entry.endedAt || 'sem-data'}-${index}`,
+        id,
         installedAt: entry.installedAt || '',
         endedAt: entry.endedAt || '',
         duration: Number(entry.duration) || 0,

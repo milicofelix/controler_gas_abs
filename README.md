@@ -73,3 +73,32 @@ Para limpar tudo no navegador:
 localStorage.removeItem('gas-control-state-v1')
 location.reload()
 ```
+
+
+## Login e usuarios locais
+
+Esta fase adiciona uma camada de login local usando `localStorage`. Nao e autenticacao segura para producao; e uma simulacao funcional para validar o fluxo mobile antes de criar backend/API.
+
+Acessos iniciais:
+
+```text
+Usuario: casa@gas.local / casa123
+Super admin: admin@gas.local / admin123
+```
+
+Chaves usadas no navegador:
+
+```text
+gas-control-users-v1
+gas-control-session-v1
+```
+
+O usuario comum ve somente o acompanhamento da propria casa. O super admin acessa o dashboard geral com nivel estimado, status, previsao, media e historico consolidado de todas as casas cadastradas.
+
+Para zerar tambem usuarios e sessao:
+
+```js
+localStorage.removeItem('gas-control-users-v1')
+localStorage.removeItem('gas-control-session-v1')
+location.reload()
+```

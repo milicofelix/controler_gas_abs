@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import {
   DEFAULT_CYCLE_DAYS,
   GAS_REMINDER_NOTIFICATION_ID,
   MOVING_AVERAGE_LIMIT,
-  STORAGE_KEY,
   averageDuration,
   calculateStats,
   createHistoryEntry,
@@ -16,8 +15,21 @@ import {
   formatMoney,
   getAlert,
   getReminderDate,
-  normalizeHistory,
 } from './gasMath'
+import {
+  DEMO_USER_EMAIL,
+  DEMO_USER_PASSWORD,
+  SUPER_ADMIN_EMAIL,
+  SUPER_ADMIN_PASSWORD,
+  clearSession,
+  createDefaultGasState,
+  createUser,
+  loadSession,
+  loadUsers,
+  normalizeGasState,
+  saveSession,
+  saveUsers,
+} from './authStorage'
 import './App.css'
 
 const STATUS_STEPS = [
@@ -37,45 +49,30 @@ async function cancelGasReminder() {
   }
 }
 
-function loadInitialState() {
-  const today = formatDateInput(new Date())
-
-  try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY))
-    if (stored?.startedAt) {
-      const manual = stored.manual ? {
-        installedAt: stored.manual.installedAt || stored.startedAt,
-        endedAt: stored.manual.endedAt || today,
-        paidValue: stored.manual.paidValue || '',
-        notes: stored.manual.notes || '',
-      } : createManualFields({
-        startedAt: stored.startedAt,
-        endedAt: today,
-        paidValue: stored.paidValue,
-        notes: stored.notes,
-      })
-
-      return {
-        startedAt: manual.installedAt || stored.startedAt,
-        cycleDays: DEFAULT_CYCLE_DAYS,
-        history: normalizeHistory(stored.history),
-        manual,
-        lastFinishedCycle: stored.lastFinishedCycle || null,
-        reminder: stored.reminder || { enabled: false, scheduledFor: '' },
-      }
-    }
-  } catch {
-    // Mantém o estado inicial padrão caso o localStorage tenha dado problema.
-  }
+function buildIntelligence(history) {
+  const recentCycles = history.slice(0, MOVING_AVERAGE_LIMIT)
+  const movingAverage = averageDuration(recentCycles)
+  const projectedCycleDays = movingAverage || DEFAULT_CYCLE_DAYS
 
   return {
-    startedAt: today,
-    cycleDays: DEFAULT_CYCLE_DAYS,
-    history: [],
-    manual: createManualFields({ startedAt: today, endedAt: today }),
-    lastFinishedCycle: null,
-    reminder: { enabled: false, scheduledFor: '' },
+    projectedCycleDays,
+    movingAverage,
+    isUsingRealAverage: movingAverage > 0,
+    sampleSize: recentCycles.length,
+    pattern: detectConsumptionPattern(history, movingAverage),
   }
+}
+
+function getUserStats(user, today = formatDateInput(new Date())) {
+  const state = normalizeGasState(user.state, today)
+  const intelligence = buildIntelligence(state.history)
+  const stats = calculateStats({
+    startedAt: state.startedAt,
+    today,
+    projectedCycleDays: intelligence.projectedCycleDays,
+  })
+
+  return { state, intelligence, stats }
 }
 
 function CylinderGauge({ percent, tone }) {
@@ -100,27 +97,217 @@ function CylinderGauge({ percent, tone }) {
   )
 }
 
-function App() {
-  const [state, setState] = useState(loadInitialState)
+function LoginScreen({ users, onLogin, onCreateUser }) {
+  const [mode, setMode] = useState('login')
+  const [form, setForm] = useState({
+    name: '',
+    homeName: '',
+    email: DEMO_USER_EMAIL,
+    password: DEMO_USER_PASSWORD,
+  })
+  const [message, setMessage] = useState('')
+
+  function update(field, value) {
+    setForm((current) => ({ ...current, [field]: value }))
+  }
+
+  function submitLogin(event) {
+    event.preventDefault()
+    const email = form.email.trim().toLowerCase()
+    const user = users.find((item) => item.email === email && item.password === form.password)
+
+    if (!user) {
+      setMessage('E-mail ou senha inválidos.')
+      return
+    }
+
+    setMessage('')
+    onLogin(user)
+  }
+
+  function submitRegister(event) {
+    event.preventDefault()
+    const name = form.name.trim()
+    const homeName = form.homeName.trim()
+    const email = form.email.trim().toLowerCase()
+    const password = form.password.trim()
+
+    if (!name || !homeName || !email || password.length < 4) {
+      setMessage('Preencha nome, casa, e-mail e uma senha com pelo menos 4 caracteres.')
+      return
+    }
+
+    if (users.some((user) => user.email === email)) {
+      setMessage('Já existe um usuário com este e-mail.')
+      return
+    }
+
+    onCreateUser(createUser({ name, homeName, email, password }))
+    setMessage('Usuário criado. Faça login para acessar sua casa.')
+    setMode('login')
+  }
+
+  return (
+    <main className="app-shell auth-shell">
+      <section className="hero-card auth-hero">
+        <div className="hero-copy">
+          <div className="brand-row">
+            <span className="brand-mark" aria-hidden="true">P13</span>
+            <span className="eyebrow">Controle Gás</span>
+          </div>
+          <h1>{mode === 'login' ? 'Entrar' : 'Nova casa'}</h1>
+          <p>Agora cada usuário acompanha o consumo da própria casa. O super admin acessa um painel geral.</p>
+        </div>
+      </section>
+
+      <section className="form-card auth-card">
+        <div className="auth-tabs" role="tablist" aria-label="Acesso">
+          <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>Login</button>
+          <button type="button" className={mode === 'register' ? 'active' : ''} onClick={() => setMode('register')}>Criar usuário</button>
+        </div>
+
+        <form className="auth-form" onSubmit={mode === 'login' ? submitLogin : submitRegister}>
+          {mode === 'register' && (
+            <>
+              <label>
+                Nome do responsável
+                <input value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="Ex.: Adriano" />
+              </label>
+
+              <label>
+                Nome da casa
+                <input value={form.homeName} onChange={(event) => update('homeName', event.target.value)} placeholder="Ex.: Casa da família" />
+              </label>
+            </>
+          )}
+
+          <label>
+            E-mail
+            <input type="email" value={form.email} onChange={(event) => update('email', event.target.value)} />
+          </label>
+
+          <label>
+            Senha
+            <input type="password" value={form.password} onChange={(event) => update('password', event.target.value)} />
+          </label>
+
+          <button type="submit" className="primary">
+            {mode === 'login' ? 'Acessar' : 'Criar usuário'}
+          </button>
+        </form>
+
+        {message && <div className="settings-status" role="status">{message}</div>}
+
+        <div className="demo-access">
+          <span className="eyebrow">Acessos locais para teste</span>
+          <p><strong>Usuário:</strong> {DEMO_USER_EMAIL} / {DEMO_USER_PASSWORD}</p>
+          <p><strong>Super admin:</strong> {SUPER_ADMIN_EMAIL} / {SUPER_ADMIN_PASSWORD}</p>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function AdminDashboard({ users, onLogout }) {
+  const today = formatDateInput(new Date())
+  const userRows = users
+    .filter((user) => user.role !== 'admin')
+    .map((user) => ({ user, ...getUserStats(user, today) }))
+  const criticalCount = userRows.filter((row) => row.stats.percent <= 10).length
+  const lowCount = userRows.filter((row) => row.stats.percent > 10 && row.stats.percent <= 25).length
+  const totalCycles = userRows.reduce((sum, row) => sum + row.state.history.length, 0)
+  const averagePercent = userRows.length
+    ? Math.round(userRows.reduce((sum, row) => sum + row.stats.percent, 0) / userRows.length)
+    : 0
+
+  return (
+    <main className="app-shell admin-shell">
+      <section className="hero-card">
+        <div className="hero-copy">
+          <div className="brand-row">
+            <span className="brand-mark" aria-hidden="true">ADM</span>
+            <span className="eyebrow">Super admin</span>
+          </div>
+          <h1>Dashboard geral</h1>
+          <p>Visão consolidada dos consumos registrados em cada casa.</p>
+        </div>
+        <button type="button" className="logout-button" onClick={onLogout}>Sair</button>
+      </section>
+
+      <section className="admin-metrics">
+        <article>
+          <span>Casas</span>
+          <strong>{userRows.length}</strong>
+        </article>
+        <article>
+          <span>Média geral</span>
+          <strong>{averagePercent}%</strong>
+        </article>
+        <article>
+          <span>Baixo</span>
+          <strong>{lowCount}</strong>
+        </article>
+        <article>
+          <span>Crítico</span>
+          <strong>{criticalCount}</strong>
+        </article>
+      </section>
+
+      <section className="history-card admin-card">
+        <div className="history-header">
+          <div>
+            <span className="eyebrow">Consumos</span>
+            <h2>Casas monitoradas</h2>
+          </div>
+          <div className="history-average">
+            <span>Ciclos</span>
+            <strong>{totalCycles}</strong>
+          </div>
+        </div>
+
+        <div className="admin-list">
+          {userRows.map(({ user, state, intelligence, stats }) => (
+            <article key={user.id} className={`admin-user-card ${stats.status.tone}`}>
+              <div className="admin-user-main">
+                <div>
+                  <strong>{user.homeName}</strong>
+                  <span>{user.name} • {user.email}</span>
+                </div>
+                <div className={`status-pill ${stats.status.tone}`}>{stats.status.label}</div>
+              </div>
+
+              <div className={`progress-track ${stats.status.tone}`}>
+                <span style={{ width: `${stats.percent}%` }}></span>
+              </div>
+
+              <div className="admin-user-grid">
+                <span>Nível: <strong>{stats.percent}%</strong></span>
+                <span>Uso: <strong>{stats.elapsedDays} dias</strong></span>
+                <span>Acaba em: <strong>{formatDisplayDate(stats.expectedEnd)}</strong></span>
+                <span>Média: <strong>{intelligence.projectedCycleDays} dias</strong></span>
+                <span>Trocas: <strong>{state.history.length}</strong></span>
+                <span>Recomendação: <strong>{stats.recommendation}</strong></span>
+              </div>
+            </article>
+          ))}
+
+          {userRows.length === 0 && (
+            <div className="empty-state">Nenhuma casa cadastrada ainda.</div>
+          )}
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function UserHome({ currentUser, onUpdateUserState, onLogout }) {
+  const [state, setState] = useState(() => normalizeGasState(currentUser.state))
   const [notificationStatus, setNotificationStatus] = useState('')
   const [settingsStatus, setSettingsStatus] = useState('')
 
   const today = formatDateInput(new Date())
 
-  const intelligence = useMemo(() => {
-    const recentCycles = state.history.slice(0, MOVING_AVERAGE_LIMIT)
-    const movingAverage = averageDuration(recentCycles)
-    const projectedCycleDays = movingAverage || DEFAULT_CYCLE_DAYS
-    const isUsingRealAverage = movingAverage > 0
-
-    return {
-      projectedCycleDays,
-      movingAverage,
-      isUsingRealAverage,
-      sampleSize: recentCycles.length,
-      pattern: detectConsumptionPattern(state.history, movingAverage),
-    }
-  }, [state.history])
+  const intelligence = useMemo(() => buildIntelligence(state.history), [state.history])
 
   const stats = useMemo(() => calculateStats({
     startedAt: state.startedAt,
@@ -132,10 +319,7 @@ function App() {
 
   const historyStats = useMemo(() => {
     if (state.history.length === 0) {
-      return {
-        averageDuration: 0,
-        totalCycles: 0,
-      }
+      return { averageDuration: 0, totalCycles: 0 }
     }
 
     return {
@@ -145,8 +329,8 @@ function App() {
   }, [state.history])
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
-  }, [state])
+    onUpdateUserState(currentUser.id, state)
+  }, [currentUser.id, onUpdateUserState, state])
 
   function updateStartedAt(event) {
     const installedAt = event.target.value || today
@@ -208,23 +392,20 @@ function App() {
   }
 
   function resetDemo() {
-    setState({
-      startedAt: today,
-      cycleDays: DEFAULT_CYCLE_DAYS,
-      history: [],
-      manual: createManualFields({ startedAt: today, endedAt: today }),
-      lastFinishedCycle: null,
-      reminder: { enabled: false, scheduledFor: '' },
-    })
-
+    setState(createDefaultGasState(today))
     void cancelGasReminder()
   }
 
   function exportBackup() {
     const payload = {
       app: 'Controle Gás',
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
+      user: {
+        name: currentUser.name,
+        homeName: currentUser.homeName,
+        email: currentUser.email,
+      },
       data: state,
     }
     const backup = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
@@ -232,31 +413,14 @@ function App() {
     const link = document.createElement('a')
 
     link.href = url
-    link.download = `controle-gas-backup-${today}.json`
+    link.download = `controle-gas-${currentUser.homeName.replaceAll(' ', '-').toLowerCase()}-${today}.json`
     link.click()
     URL.revokeObjectURL(url)
     setSettingsStatus('Backup exportado.')
   }
 
   function applyRestoredState(nextState) {
-    const restoredStartedAt = nextState.startedAt || today
-    const restoredManual = nextState.manual
-      ? {
-          installedAt: nextState.manual.installedAt || restoredStartedAt,
-          endedAt: nextState.manual.endedAt || today,
-          paidValue: nextState.manual.paidValue || '',
-          notes: nextState.manual.notes || '',
-        }
-      : createManualFields({ startedAt: restoredStartedAt, endedAt: today })
-
-    setState({
-      startedAt: restoredManual.installedAt || restoredStartedAt,
-      cycleDays: DEFAULT_CYCLE_DAYS,
-      history: normalizeHistory(nextState.history),
-      manual: restoredManual,
-      lastFinishedCycle: nextState.lastFinishedCycle || null,
-      reminder: nextState.reminder || { enabled: false, scheduledFor: '' },
-    })
+    setState(normalizeGasState(nextState, today))
   }
 
   function importBackup(event) {
@@ -336,7 +500,7 @@ function App() {
         <div className="hero-copy">
           <div className="brand-row">
             <span className="brand-mark" aria-hidden="true">P13</span>
-            <span className="eyebrow">Controle Gás</span>
+            <span className="eyebrow">{currentUser.homeName}</span>
           </div>
           <h1>Botijão P13</h1>
           <p>
@@ -346,7 +510,10 @@ function App() {
           </p>
         </div>
 
-        <div className={`status-pill ${stats.status.tone}`}>{stats.status.label}</div>
+        <div className="hero-actions">
+          <div className={`status-pill ${stats.status.tone}`}>{stats.status.label}</div>
+          <button type="button" className="logout-button" onClick={onLogout}>Sair</button>
+        </div>
       </section>
 
       <section className={`dashboard-card ${stats.status.tone}`}>
@@ -545,8 +712,8 @@ function App() {
 
         <div className="settings-grid">
           <article>
-            <span>Nome</span>
-            <strong>Controle Gás</strong>
+            <span>Usuário</span>
+            <strong>{currentUser.name}</strong>
           </article>
           <article>
             <span>Ciclos salvos</span>
@@ -573,6 +740,67 @@ function App() {
       </section>
     </main>
   )
+}
+
+function App() {
+  const [users, setUsers] = useState(loadUsers)
+  const [session, setSession] = useState(loadSession)
+
+  const currentUser = useMemo(
+    () => users.find((user) => user.id === session?.userId) || null,
+    [session, users],
+  )
+
+  useEffect(() => {
+    saveUsers(users)
+  }, [users])
+
+  function login(user) {
+    const nextSession = { userId: user.id, role: user.role }
+    setSession(nextSession)
+    saveSession(nextSession)
+  }
+
+  function logout() {
+    setSession(null)
+    clearSession()
+  }
+
+  function createNewUser(user) {
+    setUsers((current) => [...current, user])
+  }
+
+  const updateUserState = useCallback((userId, nextState) => {
+    setUsers((current) => {
+      let hasChanges = false
+
+      const nextUsers = current.map((user) => {
+        if (user.id !== userId) return user
+
+        const currentState = JSON.stringify(user.state)
+        const incomingState = JSON.stringify(nextState)
+
+        if (currentState === incomingState) {
+          return user
+        }
+
+        hasChanges = true
+        return { ...user, state: nextState }
+      })
+
+      return hasChanges ? nextUsers : current
+    })
+  }, [])
+
+  if (!currentUser) {
+    return <LoginScreen users={users} onLogin={login} onCreateUser={createNewUser} />
+  }
+
+  if (currentUser.role === 'admin') {
+    return <AdminDashboard users={users} onLogout={logout} />
+  }
+
+  return <UserHome currentUser={currentUser} onUpdateUserState={updateUserState} onLogout={logout} />
 }
 
 export default App
