@@ -11,16 +11,67 @@ const STATUS_STEPS = [
   { label: 'Crítico', tone: 'critical' },
 ]
 
-function createManualFields({ startedAt, paidValue = '', notes = '' }) {
+function createManualFields({ startedAt, endedAt, paidValue = '', notes = '' }) {
   return {
     installedAt: startedAt,
+    endedAt,
     paidValue,
     notes,
   }
 }
 
+function createHistoryEntry({ installedAt, endedAt, duration, paidValue = '', notes = '' }) {
+  return {
+    id: `${endedAt}-${installedAt}-${duration}`,
+    installedAt,
+    endedAt,
+    duration,
+    paidValue,
+    notes,
+  }
+}
+
+function normalizeHistory(history = []) {
+  return history
+    .map((entry, index) => {
+      if (typeof entry === 'number') {
+        return createHistoryEntry({
+          installedAt: '',
+          endedAt: '',
+          duration: entry,
+        })
+      }
+
+      if (!entry || typeof entry !== 'object') return null
+
+      return {
+        id: entry.id || `${entry.endedAt || 'sem-data'}-${index}`,
+        installedAt: entry.installedAt || '',
+        endedAt: entry.endedAt || '',
+        duration: Number(entry.duration) || 0,
+        paidValue: entry.paidValue || '',
+        notes: entry.notes || '',
+      }
+    })
+    .filter((entry) => entry && entry.duration > 0)
+}
+
 function formatDateInput(date) {
   return date.toISOString().slice(0, 10)
+}
+
+function formatDisplayDate(date) {
+  if (!date) return 'Sem data'
+  return date.split('-').reverse().join('/')
+}
+
+function formatMoney(value) {
+  if (!value) return ''
+
+  return Number(value).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  })
 }
 
 function daysBetween(start, end) {
@@ -46,8 +97,14 @@ function loadInitialState() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY))
     if (stored?.startedAt) {
-      const manual = stored.manual || createManualFields({
+      const manual = stored.manual ? {
+        installedAt: stored.manual.installedAt || stored.startedAt,
+        endedAt: stored.manual.endedAt || today,
+        paidValue: stored.manual.paidValue || '',
+        notes: stored.manual.notes || '',
+      } : createManualFields({
         startedAt: stored.startedAt,
+        endedAt: today,
         paidValue: stored.paidValue,
         notes: stored.notes,
       })
@@ -55,7 +112,7 @@ function loadInitialState() {
       return {
         startedAt: manual.installedAt || stored.startedAt,
         cycleDays: DEFAULT_CYCLE_DAYS,
-        history: Array.isArray(stored.history) ? stored.history : [],
+        history: normalizeHistory(stored.history),
         manual,
         lastFinishedCycle: stored.lastFinishedCycle || null,
       }
@@ -68,7 +125,7 @@ function loadInitialState() {
     startedAt: today,
     cycleDays: DEFAULT_CYCLE_DAYS,
     history: [],
-    manual: createManualFields({ startedAt: today }),
+    manual: createManualFields({ startedAt: today, endedAt: today }),
     lastFinishedCycle: null,
   }
 }
@@ -118,6 +175,22 @@ function App() {
     }
   }, [state.startedAt, state.cycleDays, today])
 
+  const historyStats = useMemo(() => {
+    if (state.history.length === 0) {
+      return {
+        averageDuration: 0,
+        totalCycles: 0,
+      }
+    }
+
+    const totalDuration = state.history.reduce((sum, entry) => sum + entry.duration, 0)
+
+    return {
+      averageDuration: Math.round(totalDuration / state.history.length),
+      totalCycles: state.history.length,
+    }
+  }, [state.history])
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   }, [state])
@@ -131,6 +204,7 @@ function App() {
       manual: {
         ...current.manual,
         installedAt,
+        endedAt: current.manual?.endedAt && current.manual.endedAt >= installedAt ? current.manual.endedAt : installedAt,
       },
     }))
   }
@@ -145,22 +219,23 @@ function App() {
     }))
   }
 
-  function registerEmptyCylinderToday() {
-    const duration = Math.max(1, daysBetween(state.startedAt, today))
-    const nextHistory = [duration, ...state.history].slice(0, 6)
-    const lastFinishedCycle = {
+  function registerCylinderChange() {
+    const endedAt = state.manual?.endedAt || today
+    const duration = Math.max(1, daysBetween(state.startedAt, endedAt))
+    const lastFinishedCycle = createHistoryEntry({
       installedAt: state.startedAt,
-      endedAt: today,
+      endedAt,
       duration,
       paidValue: state.manual?.paidValue || '',
       notes: state.manual?.notes || '',
-    }
+    })
+    const nextHistory = [lastFinishedCycle, ...state.history].slice(0, 8)
 
     setState({
-      startedAt: today,
+      startedAt: endedAt,
       cycleDays: DEFAULT_CYCLE_DAYS,
       history: nextHistory,
-      manual: createManualFields({ startedAt: today }),
+      manual: createManualFields({ startedAt: endedAt, endedAt }),
       lastFinishedCycle,
     })
   }
@@ -169,7 +244,7 @@ function App() {
     setState((current) => ({
       ...current,
       startedAt: today,
-      manual: createManualFields({ startedAt: today }),
+      manual: createManualFields({ startedAt: today, endedAt: today }),
     }))
   }
 
@@ -178,7 +253,7 @@ function App() {
       startedAt: today,
       cycleDays: DEFAULT_CYCLE_DAYS,
       history: [],
-      manual: createManualFields({ startedAt: today }),
+      manual: createManualFields({ startedAt: today, endedAt: today }),
       lastFinishedCycle: null,
     })
   }
@@ -249,6 +324,18 @@ function App() {
         </label>
 
         <label>
+          Data da troca
+          <input
+            type="date"
+            value={state.manual?.endedAt || today}
+            min={state.startedAt}
+            max={today}
+            onChange={(event) => updateManualField('endedAt', event.target.value || today)}
+            onInput={(event) => updateManualField('endedAt', event.target.value || today)}
+          />
+        </label>
+
+        <label>
           Valor pago
           <input
             type="number"
@@ -274,10 +361,10 @@ function App() {
         </label>
 
         <div className="actions">
-          <button type="button" className="primary" onClick={registerEmptyCylinderToday}>
-            Botijão acabou
+          <button type="button" className="primary" onClick={registerCylinderChange}>
+            Registrar troca
           </button>
-          <button type="button" onClick={startNewCylinder}>Novo botijão hoje</button>
+          <button type="button" onClick={startNewCylinder}>Iniciar botijão hoje</button>
           <button type="button" className="ghost" onClick={resetDemo}>Resetar</button>
         </div>
 
@@ -290,10 +377,32 @@ function App() {
 
       {state.history.length > 0 && (
         <section className="history-card">
-          <h2>Histórico usado na inteligência</h2>
+          <div className="history-header">
+            <div>
+              <span className="eyebrow">Histórico</span>
+              <h2>Últimas trocas</h2>
+            </div>
+            <div className="history-average">
+              <span>Média real</span>
+              <strong>{historyStats.averageDuration} dias</strong>
+            </div>
+          </div>
+
           <div className="history-list">
-            {state.history.map((days, index) => (
-              <span key={`${days}-${index}`}>{days} dias</span>
+            {state.history.map((cycle) => (
+              <article key={cycle.id} className="history-item">
+                <div>
+                  <strong>{cycle.duration} dias</strong>
+                  <span>{formatDisplayDate(cycle.installedAt)} até {formatDisplayDate(cycle.endedAt)}</span>
+                </div>
+
+                {(cycle.paidValue || cycle.notes) && (
+                  <div className="history-meta">
+                    {cycle.paidValue && <span>{formatMoney(cycle.paidValue)}</span>}
+                    {cycle.notes && <p>{cycle.notes}</p>}
+                  </div>
+                )}
+              </article>
             ))}
           </div>
         </section>
