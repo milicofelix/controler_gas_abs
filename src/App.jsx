@@ -1,11 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
+import { LocalNotifications } from '@capacitor/local-notifications'
+import {
+  DEFAULT_CYCLE_DAYS,
+  GAS_REMINDER_NOTIFICATION_ID,
+  MOVING_AVERAGE_LIMIT,
+  STORAGE_KEY,
+  averageDuration,
+  calculateStats,
+  createHistoryEntry,
+  createManualFields,
+  daysBetween,
+  detectConsumptionPattern,
+  formatDateInput,
+  formatDisplayDate,
+  formatMoney,
+  getAlert,
+  getReminderDate,
+  normalizeHistory,
+} from './gasMath'
 import './App.css'
 
-const STORAGE_KEY = 'gas-control-state-v1'
-const DEFAULT_CYCLE_DAYS = 35
-const MOVING_AVERAGE_LIMIT = 3
-const BUY_BUFFER_DAYS = 3
-const MS_PER_DAY = 1000 * 60 * 60 * 24
 const STATUS_STEPS = [
   { label: 'Cheio', tone: 'full' },
   { label: 'Médio', tone: 'medium' },
@@ -13,132 +27,14 @@ const STATUS_STEPS = [
   { label: 'Crítico', tone: 'critical' },
 ]
 
-function createManualFields({ startedAt, endedAt, paidValue = '', notes = '' }) {
-  return {
-    installedAt: startedAt,
-    endedAt,
-    paidValue,
-    notes,
-  }
-}
-
-function createHistoryEntry({ installedAt, endedAt, duration, paidValue = '', notes = '' }) {
-  return {
-    id: `${endedAt}-${installedAt}-${duration}`,
-    installedAt,
-    endedAt,
-    duration,
-    paidValue,
-    notes,
-  }
-}
-
-function normalizeHistory(history = []) {
-  return history
-    .map((entry, index) => {
-      if (typeof entry === 'number') {
-        return createHistoryEntry({
-          installedAt: '',
-          endedAt: '',
-          duration: entry,
-        })
-      }
-
-      if (!entry || typeof entry !== 'object') return null
-
-      return {
-        id: entry.id || `${entry.endedAt || 'sem-data'}-${index}`,
-        installedAt: entry.installedAt || '',
-        endedAt: entry.endedAt || '',
-        duration: Number(entry.duration) || 0,
-        paidValue: entry.paidValue || '',
-        notes: entry.notes || '',
-      }
+async function cancelGasReminder() {
+  try {
+    await LocalNotifications.cancel({
+      notifications: [{ id: GAS_REMINDER_NOTIFICATION_ID }],
     })
-    .filter((entry) => entry && entry.duration > 0)
-}
-
-function formatDateInput(date) {
-  return date.toISOString().slice(0, 10)
-}
-
-function formatDisplayDate(date) {
-  if (!date) return 'Sem data'
-  return date.split('-').reverse().join('/')
-}
-
-function formatMoney(value) {
-  if (!value) return ''
-
-  return Number(value).toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  })
-}
-
-function addDays(date, days) {
-  const nextDate = new Date(`${date}T00:00:00`)
-  nextDate.setDate(nextDate.getDate() + Number(days))
-  return formatDateInput(nextDate)
-}
-
-function averageDuration(cycles) {
-  if (cycles.length === 0) return 0
-  return Math.round(cycles.reduce((sum, entry) => sum + entry.duration, 0) / cycles.length)
-}
-
-function detectConsumptionPattern(history, movingAverage) {
-  if (history.length < 4) {
-    return {
-      tone: 'neutral',
-      label: 'Aguardando mais dados',
-      message: 'Com pelo menos 4 trocas, o app consegue comparar melhor o padrão.',
-    }
+  } catch {
+    // O cancelamento pode falhar no navegador; o app segue funcionando.
   }
-
-  const [latestCycle, ...previousCycles] = history
-  const previousAverage = averageDuration(previousCycles.slice(0, MOVING_AVERAGE_LIMIT))
-  const lowerLimit = previousAverage * 0.75
-  const upperLimit = previousAverage * 1.25
-
-  if (latestCycle.duration < lowerLimit) {
-    return {
-      tone: 'warning',
-      label: 'Consumo acima do padrão',
-      message: `O último ciclo durou ${latestCycle.duration} dias, abaixo da média recente de ${previousAverage} dias.`,
-    }
-  }
-
-  if (latestCycle.duration > upperLimit) {
-    return {
-      tone: 'positive',
-      label: 'Consumo abaixo do padrão',
-      message: `O último ciclo durou ${latestCycle.duration} dias, acima da média recente de ${previousAverage} dias.`,
-    }
-  }
-
-  return {
-    tone: 'stable',
-    label: 'Consumo dentro do padrão',
-    message: `Os últimos ciclos estão próximos da média móvel de ${movingAverage} dias.`,
-  }
-}
-
-function daysBetween(start, end) {
-  const startDate = new Date(`${start}T00:00:00`)
-  const endDate = new Date(`${end}T00:00:00`)
-  return Math.max(0, Math.floor((endDate - startDate) / MS_PER_DAY))
-}
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value))
-}
-
-function getStatus(percent) {
-  if (percent <= 10) return { label: 'Crítico', tone: 'critical', message: 'Compre hoje para evitar ficar sem gás.' }
-  if (percent <= 25) return { label: 'Baixo', tone: 'low', message: 'Já vale programar a próxima compra.' }
-  if (percent <= 55) return { label: 'Médio', tone: 'medium', message: 'Consumo dentro do esperado.' }
-  return { label: 'Cheio', tone: 'full', message: 'Botijão ainda com boa margem.' }
 }
 
 function loadInitialState() {
@@ -165,6 +61,7 @@ function loadInitialState() {
         history: normalizeHistory(stored.history),
         manual,
         lastFinishedCycle: stored.lastFinishedCycle || null,
+        reminder: stored.reminder || { enabled: false, scheduledFor: '' },
       }
     }
   } catch {
@@ -177,6 +74,7 @@ function loadInitialState() {
     history: [],
     manual: createManualFields({ startedAt: today, endedAt: today }),
     lastFinishedCycle: null,
+    reminder: { enabled: false, scheduledFor: '' },
   }
 }
 
@@ -204,6 +102,8 @@ function CylinderGauge({ percent, tone }) {
 
 function App() {
   const [state, setState] = useState(loadInitialState)
+  const [notificationStatus, setNotificationStatus] = useState('')
+  const [settingsStatus, setSettingsStatus] = useState('')
 
   const today = formatDateInput(new Date())
 
@@ -222,24 +122,13 @@ function App() {
     }
   }, [state.history])
 
-  const stats = useMemo(() => {
-    const elapsedDays = daysBetween(state.startedAt, today)
-    const usedPercent = clamp((elapsedDays / intelligence.projectedCycleDays) * 100, 0, 100)
-    const percent = Math.round(100 - usedPercent)
-    const remainingDays = Math.max(0, Math.ceil(intelligence.projectedCycleDays - elapsedDays))
-    const buyInDays = Math.max(0, remainingDays - BUY_BUFFER_DAYS)
-    const status = getStatus(percent)
+  const stats = useMemo(() => calculateStats({
+    startedAt: state.startedAt,
+    today,
+    projectedCycleDays: intelligence.projectedCycleDays,
+  }), [state.startedAt, intelligence.projectedCycleDays, today])
 
-    return {
-      elapsedDays,
-      percent,
-      remainingDays,
-      buyInDays,
-      status,
-      expectedEnd: addDays(state.startedAt, intelligence.projectedCycleDays),
-      recommendation: buyInDays === 0 ? 'Comprar agora' : `Comprar em ${buyInDays} dias`,
-    }
-  }, [state.startedAt, intelligence.projectedCycleDays, today])
+  const visualAlert = getAlert(stats.percent)
 
   const historyStats = useMemo(() => {
     if (state.history.length === 0) {
@@ -301,7 +190,10 @@ function App() {
       history: nextHistory,
       manual: createManualFields({ startedAt: endedAt, endedAt }),
       lastFinishedCycle,
+      reminder: { enabled: false, scheduledFor: '' },
     })
+
+    void cancelGasReminder()
   }
 
   function startNewCylinder() {
@@ -309,7 +201,10 @@ function App() {
       ...current,
       startedAt: today,
       manual: createManualFields({ startedAt: today, endedAt: today }),
+      reminder: { enabled: false, scheduledFor: '' },
     }))
+
+    void cancelGasReminder()
   }
 
   function resetDemo() {
@@ -319,15 +214,131 @@ function App() {
       history: [],
       manual: createManualFields({ startedAt: today, endedAt: today }),
       lastFinishedCycle: null,
+      reminder: { enabled: false, scheduledFor: '' },
     })
+
+    void cancelGasReminder()
+  }
+
+  function exportBackup() {
+    const payload = {
+      app: 'Controle Gás',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      data: state,
+    }
+    const backup = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(backup)
+    const link = document.createElement('a')
+
+    link.href = url
+    link.download = `controle-gas-backup-${today}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    setSettingsStatus('Backup exportado.')
+  }
+
+  function applyRestoredState(nextState) {
+    const restoredStartedAt = nextState.startedAt || today
+    const restoredManual = nextState.manual
+      ? {
+          installedAt: nextState.manual.installedAt || restoredStartedAt,
+          endedAt: nextState.manual.endedAt || today,
+          paidValue: nextState.manual.paidValue || '',
+          notes: nextState.manual.notes || '',
+        }
+      : createManualFields({ startedAt: restoredStartedAt, endedAt: today })
+
+    setState({
+      startedAt: restoredManual.installedAt || restoredStartedAt,
+      cycleDays: DEFAULT_CYCLE_DAYS,
+      history: normalizeHistory(nextState.history),
+      manual: restoredManual,
+      lastFinishedCycle: nextState.lastFinishedCycle || null,
+      reminder: nextState.reminder || { enabled: false, scheduledFor: '' },
+    })
+  }
+
+  function importBackup(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result)
+        const nextState = parsed.data || parsed
+
+        if (!nextState || typeof nextState !== 'object' || !nextState.startedAt) {
+          throw new Error('backup-invalido')
+        }
+
+        applyRestoredState(nextState)
+        setSettingsStatus('Backup importado.')
+      } catch {
+        setSettingsStatus('Não foi possível importar este arquivo.')
+      } finally {
+        event.target.value = ''
+      }
+    }
+
+    reader.readAsText(file)
+  }
+
+  async function scheduleBuyReminder() {
+    setNotificationStatus('Configurando lembrete...')
+
+    try {
+      const currentPermission = await LocalNotifications.checkPermissions()
+      const permission = currentPermission.display === 'granted'
+        ? currentPermission
+        : await LocalNotifications.requestPermissions()
+
+      if (permission.display !== 'granted') {
+        setNotificationStatus('Permissão de notificações não concedida.')
+        return
+      }
+
+      const reminderDate = getReminderDate(today, stats.buyInDays)
+
+      await LocalNotifications.cancel({
+        notifications: [{ id: GAS_REMINDER_NOTIFICATION_ID }],
+      })
+
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: GAS_REMINDER_NOTIFICATION_ID,
+            title: 'Comprar gás',
+            body: `Seu botijão está previsto para acabar em ${formatDisplayDate(stats.expectedEnd)}.`,
+            schedule: { at: reminderDate },
+          },
+        ],
+      })
+
+      setState((current) => ({
+        ...current,
+        reminder: {
+          enabled: true,
+          scheduledFor: formatDateInput(reminderDate),
+        },
+      }))
+      setNotificationStatus(`Lembrete ativo para ${formatDisplayDate(formatDateInput(reminderDate))}.`)
+    } catch {
+      setNotificationStatus('Notificações locais não estão disponíveis neste ambiente.')
+    }
   }
 
   return (
     <main className="app-shell">
       <section className="hero-card">
         <div className="hero-copy">
-          <span className="eyebrow">Controle visual do gás</span>
-          <h1>Botijão de cozinha</h1>
+          <div className="brand-row">
+            <span className="brand-mark" aria-hidden="true">P13</span>
+            <span className="eyebrow">Controle Gás</span>
+          </div>
+          <h1>Botijão P13</h1>
           <p>
             {intelligence.isUsingRealAverage
               ? `Previsão inteligente baseada na média móvel dos últimos ${intelligence.sampleSize} ciclos.`
@@ -404,7 +415,29 @@ function App() {
           <strong>{intelligence.pattern.label}</strong>
           <p>{intelligence.pattern.message}</p>
         </div>
+
+        <div className="reminder-actions">
+          <button type="button" className="primary" onClick={scheduleBuyReminder}>
+            Ativar lembrete de compra
+          </button>
+
+          {(notificationStatus || state.reminder?.enabled) && (
+            <span>
+              {notificationStatus || `Lembrete ativo para ${formatDisplayDate(state.reminder.scheduledFor)}.`}
+            </span>
+          )}
+        </div>
       </section>
+
+      {visualAlert && (
+        <section className={`alert-card ${visualAlert.tone}`}>
+          <div>
+            <span className="eyebrow">Alertas</span>
+            <h2>{visualAlert.title}</h2>
+            <p>{visualAlert.message}</p>
+          </div>
+        </section>
+      )}
 
       <section className="form-card">
         <div className="form-header">
@@ -501,6 +534,43 @@ function App() {
           </div>
         </section>
       )}
+
+      <section className="settings-card">
+        <div className="settings-header">
+          <div>
+            <span className="eyebrow">Configurações</span>
+            <h2>Dados do app</h2>
+          </div>
+        </div>
+
+        <div className="settings-grid">
+          <article>
+            <span>Nome</span>
+            <strong>Controle Gás</strong>
+          </article>
+          <article>
+            <span>Ciclos salvos</span>
+            <strong>{historyStats.totalCycles}</strong>
+          </article>
+        </div>
+
+        <div className="settings-actions">
+          <button type="button" className="primary" onClick={exportBackup}>
+            Exportar backup
+          </button>
+
+          <label className="file-action">
+            Importar backup
+            <input type="file" accept="application/json" onChange={importBackup} />
+          </label>
+        </div>
+
+        {settingsStatus && (
+          <div className="settings-status" role="status">
+            {settingsStatus}
+          </div>
+        )}
+      </section>
     </main>
   )
 }
