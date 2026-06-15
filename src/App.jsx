@@ -11,6 +11,14 @@ const STATUS_STEPS = [
   { label: 'Crítico', tone: 'critical' },
 ]
 
+function createManualFields({ startedAt, paidValue = '', notes = '' }) {
+  return {
+    installedAt: startedAt,
+    paidValue,
+    notes,
+  }
+}
+
 function formatDateInput(date) {
   return date.toISOString().slice(0, 10)
 }
@@ -38,10 +46,18 @@ function loadInitialState() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY))
     if (stored?.startedAt) {
-      return {
+      const manual = stored.manual || createManualFields({
         startedAt: stored.startedAt,
-        cycleDays: stored.cycleDays || DEFAULT_CYCLE_DAYS,
+        paidValue: stored.paidValue,
+        notes: stored.notes,
+      })
+
+      return {
+        startedAt: manual.installedAt || stored.startedAt,
+        cycleDays: DEFAULT_CYCLE_DAYS,
         history: Array.isArray(stored.history) ? stored.history : [],
+        manual,
+        lastFinishedCycle: stored.lastFinishedCycle || null,
       }
     }
   } catch {
@@ -52,6 +68,8 @@ function loadInitialState() {
     startedAt: today,
     cycleDays: DEFAULT_CYCLE_DAYS,
     history: [],
+    manual: createManualFields({ startedAt: today }),
+    lastFinishedCycle: null,
   }
 }
 
@@ -79,7 +97,6 @@ function CylinderGauge({ percent, tone }) {
 
 function App() {
   const [state, setState] = useState(loadInitialState)
-  const [endedAt, setEndedAt] = useState(formatDateInput(new Date()))
 
   const today = formatDateInput(new Date())
 
@@ -106,29 +123,64 @@ function App() {
   }, [state])
 
   function updateStartedAt(event) {
-    setState((current) => ({ ...current, startedAt: event.target.value || today }))
+    const installedAt = event.target.value || today
+
+    setState((current) => ({
+      ...current,
+      startedAt: installedAt,
+      manual: {
+        ...current.manual,
+        installedAt,
+      },
+    }))
   }
 
-  function registerEmptyCylinder() {
-    const duration = Math.max(1, daysBetween(state.startedAt, endedAt || today))
+  function updateManualField(field, value) {
+    setState((current) => ({
+      ...current,
+      manual: {
+        ...current.manual,
+        [field]: value,
+      },
+    }))
+  }
+
+  function registerEmptyCylinderToday() {
+    const duration = Math.max(1, daysBetween(state.startedAt, today))
     const nextHistory = [duration, ...state.history].slice(0, 6)
-    const average = Math.round(nextHistory.reduce((sum, item) => sum + item, 0) / nextHistory.length)
+    const lastFinishedCycle = {
+      installedAt: state.startedAt,
+      endedAt: today,
+      duration,
+      paidValue: state.manual?.paidValue || '',
+      notes: state.manual?.notes || '',
+    }
 
     setState({
-      startedAt: endedAt || today,
-      cycleDays: average,
+      startedAt: today,
+      cycleDays: DEFAULT_CYCLE_DAYS,
       history: nextHistory,
+      manual: createManualFields({ startedAt: today }),
+      lastFinishedCycle,
     })
   }
 
   function startNewCylinder() {
-    setState((current) => ({ ...current, startedAt: today }))
-    setEndedAt(today)
+    setState((current) => ({
+      ...current,
+      startedAt: today,
+      manual: createManualFields({ startedAt: today }),
+    }))
   }
 
   function resetDemo() {
-    setState({ startedAt: today, cycleDays: DEFAULT_CYCLE_DAYS, history: [] })
-    setEndedAt(today)
+    setState({
+      startedAt: today,
+      cycleDays: DEFAULT_CYCLE_DAYS,
+      history: [],
+      manual: createManualFields({ startedAt: today }),
+      lastFinishedCycle: null,
+    })
   }
 
   return (
@@ -138,8 +190,7 @@ function App() {
           <span className="eyebrow">Controle visual do gás</span>
           <h1>Botijão de cozinha</h1>
           <p>
-            Estimativa baseada em {state.cycleDays} dias de consumo. Quanto mais trocas você registrar,
-            melhor a previsão fica.
+            Estimativa inicial baseada em {DEFAULT_CYCLE_DAYS} dias de consumo. A previsão inteligente entra nas próximas fases.
           </p>
         </div>
 
@@ -187,23 +238,54 @@ function App() {
       </section>
 
       <section className="form-card">
+        <div className="form-header">
+          <span className="eyebrow">Controle manual</span>
+          <h2>Troca do botijão</h2>
+        </div>
+
         <label>
-          Data da última troca
-          <input type="date" value={state.startedAt} max={today} onChange={updateStartedAt} />
+          Data da instalação
+          <input type="date" value={state.startedAt} max={today} onChange={updateStartedAt} onInput={updateStartedAt} />
         </label>
 
         <label>
-          Quando acabou?
-          <input type="date" value={endedAt} max={today} onChange={(event) => setEndedAt(event.target.value)} />
+          Valor pago
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            inputMode="decimal"
+            placeholder="Opcional"
+            value={state.manual?.paidValue || ''}
+            onChange={(event) => updateManualField('paidValue', event.target.value)}
+            onInput={(event) => updateManualField('paidValue', event.target.value)}
+          />
+        </label>
+
+        <label className="notes-field">
+          Observações
+          <textarea
+            rows="3"
+            placeholder="Opcional"
+            value={state.manual?.notes || ''}
+            onChange={(event) => updateManualField('notes', event.target.value)}
+            onInput={(event) => updateManualField('notes', event.target.value)}
+          />
         </label>
 
         <div className="actions">
-          <button type="button" className="primary" onClick={registerEmptyCylinder}>
-            Registrar troca e recalcular média
+          <button type="button" className="primary" onClick={registerEmptyCylinderToday}>
+            Botijão acabou
           </button>
           <button type="button" onClick={startNewCylinder}>Novo botijão hoje</button>
           <button type="button" className="ghost" onClick={resetDemo}>Resetar</button>
         </div>
+
+        {state.lastFinishedCycle && (
+          <div className="cycle-feedback" role="status">
+            Último ciclo fechado com {state.lastFinishedCycle.duration} dias.
+          </div>
+        )}
       </section>
 
       {state.history.length > 0 && (

@@ -29,7 +29,8 @@
 .reading-label,
 .metrics-grid span,
 .form-card label,
-.history-card h2 {
+.history-card h2,
+.cycle-feedback {
   color: #9ca3af;
   font-size: 13px;
   font-weight: 700;
@@ -376,19 +377,31 @@
   gap: 14px;
 }
 
+.form-header h2 {
+  margin: 6px 0 0;
+  color: #f8fafc;
+  font-size: 24px;
+  line-height: 1.1;
+}
+
 .form-card label {
   display: grid;
   gap: 8px;
 }
 
 input,
+textarea,
 button {
   width: 100%;
-  min-height: 48px;
   box-sizing: border-box;
   border: 0;
   border-radius: 16px;
   font: inherit;
+}
+
+input,
+button {
+  min-height: 48px;
 }
 
 input {
@@ -396,6 +409,20 @@ input {
   background: rgba(15, 23, 42, 0.72);
   padding: 0 14px;
   outline: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+textarea {
+  min-height: 96px;
+  resize: vertical;
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.72);
+  padding: 14px;
+  outline: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #64748b;
 }
 
 .actions {
@@ -420,6 +447,14 @@ button.ghost {
   color: #cbd5e1;
   background: transparent;
   outline: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.cycle-feedback {
+  border-radius: 16px;
+  padding: 12px;
+  color: #bae6fd;
+  background: rgba(14, 165, 233, 0.12);
+  text-align: center;
 }
 
 .history-card h2 {
@@ -509,6 +544,12 @@ button.ghost {
 
   .form-card {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .form-header,
+  .notes-field,
+  .cycle-feedback {
+    grid-column: 1 / -1;
   }
 
   .actions {
