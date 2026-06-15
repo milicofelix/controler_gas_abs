@@ -3,6 +3,8 @@ import './App.css'
 
 const STORAGE_KEY = 'gas-control-state-v1'
 const DEFAULT_CYCLE_DAYS = 35
+const MOVING_AVERAGE_LIMIT = 3
+const BUY_BUFFER_DAYS = 3
 const MS_PER_DAY = 1000 * 60 * 60 * 24
 const STATUS_STEPS = [
   { label: 'Cheio', tone: 'full' },
@@ -72,6 +74,54 @@ function formatMoney(value) {
     style: 'currency',
     currency: 'BRL',
   })
+}
+
+function addDays(date, days) {
+  const nextDate = new Date(`${date}T00:00:00`)
+  nextDate.setDate(nextDate.getDate() + Number(days))
+  return formatDateInput(nextDate)
+}
+
+function averageDuration(cycles) {
+  if (cycles.length === 0) return 0
+  return Math.round(cycles.reduce((sum, entry) => sum + entry.duration, 0) / cycles.length)
+}
+
+function detectConsumptionPattern(history, movingAverage) {
+  if (history.length < 4) {
+    return {
+      tone: 'neutral',
+      label: 'Aguardando mais dados',
+      message: 'Com pelo menos 4 trocas, o app consegue comparar melhor o padrão.',
+    }
+  }
+
+  const [latestCycle, ...previousCycles] = history
+  const previousAverage = averageDuration(previousCycles.slice(0, MOVING_AVERAGE_LIMIT))
+  const lowerLimit = previousAverage * 0.75
+  const upperLimit = previousAverage * 1.25
+
+  if (latestCycle.duration < lowerLimit) {
+    return {
+      tone: 'warning',
+      label: 'Consumo acima do padrão',
+      message: `O último ciclo durou ${latestCycle.duration} dias, abaixo da média recente de ${previousAverage} dias.`,
+    }
+  }
+
+  if (latestCycle.duration > upperLimit) {
+    return {
+      tone: 'positive',
+      label: 'Consumo abaixo do padrão',
+      message: `O último ciclo durou ${latestCycle.duration} dias, acima da média recente de ${previousAverage} dias.`,
+    }
+  }
+
+  return {
+    tone: 'stable',
+    label: 'Consumo dentro do padrão',
+    message: `Os últimos ciclos estão próximos da média móvel de ${movingAverage} dias.`,
+  }
 }
 
 function daysBetween(start, end) {
@@ -157,23 +207,39 @@ function App() {
 
   const today = formatDateInput(new Date())
 
+  const intelligence = useMemo(() => {
+    const recentCycles = state.history.slice(0, MOVING_AVERAGE_LIMIT)
+    const movingAverage = averageDuration(recentCycles)
+    const projectedCycleDays = movingAverage || DEFAULT_CYCLE_DAYS
+    const isUsingRealAverage = movingAverage > 0
+
+    return {
+      projectedCycleDays,
+      movingAverage,
+      isUsingRealAverage,
+      sampleSize: recentCycles.length,
+      pattern: detectConsumptionPattern(state.history, movingAverage),
+    }
+  }, [state.history])
+
   const stats = useMemo(() => {
     const elapsedDays = daysBetween(state.startedAt, today)
-    const usedPercent = clamp((elapsedDays / state.cycleDays) * 100, 0, 100)
+    const usedPercent = clamp((elapsedDays / intelligence.projectedCycleDays) * 100, 0, 100)
     const percent = Math.round(100 - usedPercent)
-    const remainingDays = Math.max(0, Math.ceil(state.cycleDays - elapsedDays))
+    const remainingDays = Math.max(0, Math.ceil(intelligence.projectedCycleDays - elapsedDays))
+    const buyInDays = Math.max(0, remainingDays - BUY_BUFFER_DAYS)
     const status = getStatus(percent)
-    const expectedEnd = new Date(`${state.startedAt}T00:00:00`)
-    expectedEnd.setDate(expectedEnd.getDate() + Number(state.cycleDays))
 
     return {
       elapsedDays,
       percent,
       remainingDays,
+      buyInDays,
       status,
-      expectedEnd: formatDateInput(expectedEnd),
+      expectedEnd: addDays(state.startedAt, intelligence.projectedCycleDays),
+      recommendation: buyInDays === 0 ? 'Comprar agora' : `Comprar em ${buyInDays} dias`,
     }
-  }, [state.startedAt, state.cycleDays, today])
+  }, [state.startedAt, intelligence.projectedCycleDays, today])
 
   const historyStats = useMemo(() => {
     if (state.history.length === 0) {
@@ -183,10 +249,8 @@ function App() {
       }
     }
 
-    const totalDuration = state.history.reduce((sum, entry) => sum + entry.duration, 0)
-
     return {
-      averageDuration: Math.round(totalDuration / state.history.length),
+      averageDuration: averageDuration(state.history),
       totalCycles: state.history.length,
     }
   }, [state.history])
@@ -265,7 +329,9 @@ function App() {
           <span className="eyebrow">Controle visual do gás</span>
           <h1>Botijão de cozinha</h1>
           <p>
-            Estimativa inicial baseada em {DEFAULT_CYCLE_DAYS} dias de consumo. A previsão inteligente entra nas próximas fases.
+            {intelligence.isUsingRealAverage
+              ? `Previsão inteligente baseada na média móvel dos últimos ${intelligence.sampleSize} ciclos.`
+              : `Estimativa inicial baseada em ${DEFAULT_CYCLE_DAYS} dias de consumo.`}
           </p>
         </div>
 
@@ -310,6 +376,34 @@ function App() {
           <span>Previsão de acabar</span>
           <strong>{stats.expectedEnd.split('-').reverse().join('/')}</strong>
         </article>
+      </section>
+
+      <section className={`intelligence-card ${intelligence.pattern.tone}`}>
+        <div className="intelligence-header">
+          <div>
+            <span className="eyebrow">Inteligência</span>
+            <h2>{stats.recommendation}</h2>
+          </div>
+          <div className="intelligence-badge">
+            {intelligence.isUsingRealAverage ? 'Média real' : 'Base inicial'}
+          </div>
+        </div>
+
+        <div className="intelligence-grid">
+          <article>
+            <span>Média móvel</span>
+            <strong>{intelligence.projectedCycleDays} dias</strong>
+          </article>
+          <article>
+            <span>Previsão</span>
+            <strong>{formatDisplayDate(stats.expectedEnd)}</strong>
+          </article>
+        </div>
+
+        <div className="pattern-note">
+          <strong>{intelligence.pattern.label}</strong>
+          <p>{intelligence.pattern.message}</p>
+        </div>
       </section>
 
       <section className="form-card">
