@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" rx="220" fill="#101827"/>
+  <circle cx="250" cy="176" r="170" fill="#ef4444" opacity="0.22"/>
+  <circle cx="804" cy="224" r="130" fill="#0ea5e9" opacity="0.18"/>
+  <path d="M342 376h340v96H342z" fill="#f8fafc"/>
+  <path d="M356 406c0-86 70-156 156-156s156 70 156 156h-88c0-38-30-68-68-68s-68 30-68 68z" fill="#f8fafc"/>
+  <path d="M384 438h256v70H384z" fill="#94a3b8"/>
+  <rect x="276" y="446" width="472" height="390" rx="124" fill="#ef4444"/>
+  <rect x="310" y="480" width="404" height="322" rx="96" fill="#dc2626"/>
+  <path d="M310 480h404v168H310z" fill="#22c55e" opacity="0.9"/>
+  <path d="M372 522h86v218h-86z" fill="#f8fafc" opacity="0.2"/>
+  <path d="M322 822h380v48H322z" fill="#f8fafc"/>
+  <text x="512" y="666" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="154" font-weight="800" fill="#ffffff">P13</text>
+</svg>

@@ -1,16 +1,75 @@
-# React + Vite
+# Controle Gas
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplicativo React/Vite para acompanhar o consumo de um botijao P13, com historico local e previsao inteligente baseada nos ultimos ciclos.
 
-Currently, two official plugins are available:
+## Rodar no navegador
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+docker compose up -d gas_app
+```
 
-## React Compiler
+Depois acesse:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```text
+http://localhost:8090
+```
 
-## Expanding the ESLint configuration
+## Build e validacao
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+docker compose run --rm gas_app npm run build
+docker compose run --rm gas_app npm run lint
+```
+
+## Mobile hibrido
+
+O app usa Capacitor com:
+
+- Android em `android/`
+- iOS em `ios/`
+- assets fonte em `resources/icon.svg` e `resources/splash.svg`
+- assets nativos gerados por `npm run mobile:assets`
+
+Sincronizar app web com as plataformas nativas:
+
+```bash
+docker compose run --rm gas_app npm run cap:sync
+```
+
+Atualizar apenas Android:
+
+```bash
+docker compose run --rm gas_app npm run cap:android
+```
+
+Atualizar apenas iOS:
+
+```bash
+docker compose run --rm gas_app npm run cap:ios
+```
+
+## Abrir nas IDEs nativas
+
+Com Node instalado localmente e as dependencias instaladas, use:
+
+```bash
+npm run cap:open:android
+npm run cap:open:ios
+```
+
+Android precisa de Android Studio/Android SDK. iOS precisa de macOS com Xcode.
+
+## Dados locais
+
+Hoje os dados ficam no `localStorage`, na chave:
+
+```text
+gas-control-state-v1
+```
+
+Para limpar tudo no navegador:
+
+```js
+localStorage.removeItem('gas-control-state-v1')
+location.reload()
+```
