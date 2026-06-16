@@ -4,6 +4,18 @@ export const MOVING_AVERAGE_LIMIT = 3
 export const BUY_BUFFER_DAYS = 3
 export const GAS_REMINDER_NOTIFICATION_ID = 1301
 
+export const GAS_BRANDS = [
+  { id: 'ultragaz', name: 'Ultragaz' },
+  { id: 'copagaz', name: 'Copagaz' },
+  { id: 'liquigas', name: 'Liquigás' },
+  { id: 'consigaz', name: 'Consigaz' },
+  { id: 'supergasbras', name: 'Supergasbras' },
+  { id: 'nacional-gas', name: 'Nacional Gás' },
+  { id: 'outra', name: 'Outra' },
+]
+
+export const DEFAULT_GAS_BRAND = GAS_BRANDS[0]
+
 const MS_PER_DAY = 1000 * 60 * 60 * 24
 
 export function createManualFields({ startedAt, endedAt, paidValue = '', notes = '' }) {
@@ -15,10 +27,23 @@ export function createManualFields({ startedAt, endedAt, paidValue = '', notes =
   }
 }
 
-export function createHistoryEntry({ installedAt, endedAt, duration, paidValue = '', notes = '' }) {
+export function normalizeBrand(brand = DEFAULT_GAS_BRAND) {
+  const matchedBrand = GAS_BRANDS.find((item) => item.id === brand?.id)
+  const fallback = matchedBrand || DEFAULT_GAS_BRAND
+  const name = brand?.name?.trim() || matchedBrand?.name || fallback.name
+
+  return {
+    id: matchedBrand?.id || brand?.id || fallback.id,
+    name,
+    logo: brand?.logo || '',
+  }
+}
+
+export function createHistoryEntry({ installedAt, endedAt, duration, paidValue = '', notes = '', brand = DEFAULT_GAS_BRAND }) {
   const uniqueSuffix = typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const normalizedBrand = normalizeBrand(brand)
 
   return {
     id: `${endedAt}-${installedAt}-${duration}-${uniqueSuffix}`,
@@ -27,6 +52,9 @@ export function createHistoryEntry({ installedAt, endedAt, duration, paidValue =
     duration,
     paidValue,
     notes,
+    brandId: normalizedBrand.id,
+    brandName: normalizedBrand.name,
+    brandLogo: normalizedBrand.logo,
   }
 }
 
@@ -56,6 +84,9 @@ export function normalizeHistory(history = []) {
         duration: Number(entry.duration) || 0,
         paidValue: entry.paidValue || '',
         notes: entry.notes || '',
+        brandId: entry.brandId || entry.brand?.id || DEFAULT_GAS_BRAND.id,
+        brandName: entry.brandName || entry.brand?.name || DEFAULT_GAS_BRAND.name,
+        brandLogo: entry.brandLogo || entry.brand?.logo || '',
       }
     })
     .filter((entry) => entry && entry.duration > 0)
@@ -191,4 +222,120 @@ export function calculateStats({ startedAt, today, projectedCycleDays }) {
     expectedEnd: addDays(startedAt, projectedCycleDays),
     recommendation: buyInDays === 0 ? 'Comprar agora' : `Comprar em ${buyInDays} dias`,
   }
+}
+
+export function calculateConsumptionStats(history = []) {
+  if (history.length === 0) {
+    return {
+      averageDuration: 0,
+      shortestDuration: 0,
+      longestDuration: 0,
+      annualConsumption: 0,
+    }
+  }
+
+  const durations = history.map((entry) => entry.duration)
+  const average = averageDuration(history)
+
+  return {
+    averageDuration: average,
+    shortestDuration: Math.min(...durations),
+    longestDuration: Math.max(...durations),
+    annualConsumption: average > 0 ? Math.round(365 / average) : 0,
+  }
+}
+
+export function calculateFinancialStats(history = []) {
+  const paidValues = history
+    .map((entry) => Number(entry.paidValue))
+    .filter((value) => Number.isFinite(value) && value > 0)
+
+  if (paidValues.length === 0) {
+    return {
+      averagePaid: 0,
+      monthlySpend: 0,
+      annualSpend: 0,
+      priceDelta: 0,
+    }
+  }
+
+  const averagePaid = paidValues.reduce((sum, value) => sum + value, 0) / paidValues.length
+  const newestPrice = paidValues[0]
+  const oldestPrice = paidValues[paidValues.length - 1]
+
+  return {
+    averagePaid,
+    monthlySpend: averagePaid / (DEFAULT_CYCLE_DAYS / 30),
+    annualSpend: averagePaid * (365 / DEFAULT_CYCLE_DAYS),
+    priceDelta: newestPrice - oldestPrice,
+  }
+}
+
+export function calculateBrandStats(history = []) {
+  const brandMap = new Map()
+
+  history.forEach((entry) => {
+    const brandName = entry.brandName || DEFAULT_GAS_BRAND.name
+    const current = brandMap.get(brandName) || {
+      name: brandName,
+      logo: entry.brandLogo || '',
+      cycles: 0,
+      totalDuration: 0,
+      shortestDuration: 0,
+      longestDuration: 0,
+      totalPaid: 0,
+      paidCount: 0,
+    }
+    const paidValue = Number(entry.paidValue)
+
+    current.cycles += 1
+    current.totalDuration += entry.duration
+    current.shortestDuration = current.shortestDuration
+      ? Math.min(current.shortestDuration, entry.duration)
+      : entry.duration
+    current.longestDuration = Math.max(current.longestDuration, entry.duration)
+
+    if (Number.isFinite(paidValue) && paidValue > 0) {
+      current.totalPaid += paidValue
+      current.paidCount += 1
+    }
+
+    brandMap.set(brandName, current)
+  })
+
+  return [...brandMap.values()]
+    .map((brand) => ({
+      ...brand,
+      averageDuration: Math.round(brand.totalDuration / brand.cycles),
+      averagePaid: brand.paidCount > 0 ? brand.totalPaid / brand.paidCount : 0,
+    }))
+    .sort((a, b) => b.averageDuration - a.averageDuration)
+}
+
+export function getSmartAlerts({ stats, reserveAvailable = false }) {
+  const alerts = []
+
+  if (stats.percent <= 10) {
+    alerts.push({
+      tone: 'critical',
+      title: 'Estoque crítico',
+      message: reserveAvailable
+        ? 'Troque pelo botijão reserva e compre um novo para repor o estoque.'
+        : 'O gás está no limite. Compre ou troque o botijão hoje.',
+    })
+  } else if (stats.percent <= 25) {
+    alerts.push({
+      tone: 'low',
+      title: 'Comprar em breve',
+      message: `Recomendação atual: ${stats.recommendation.toLowerCase()}.`,
+    })
+  }
+
+  alerts.push({
+    tone: 'neutral',
+    title: 'Previsão de término',
+    message: `Este botijão está previsto para acabar em ${formatDisplayDate(stats.expectedEnd)}.`,
+  })
+
+  return alerts
 }

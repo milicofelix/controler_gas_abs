@@ -1,4 +1,12 @@
-import { DEFAULT_CYCLE_DAYS, STORAGE_KEY, createManualFields, formatDateInput, normalizeHistory } from './gasMath'
+import {
+  DEFAULT_CYCLE_DAYS,
+  DEFAULT_GAS_BRAND,
+  STORAGE_KEY,
+  createManualFields,
+  formatDateInput,
+  normalizeBrand,
+  normalizeHistory,
+} from './gasMath'
 
 export const AUTH_SESSION_KEY = 'gas-control-session-v1'
 export const AUTH_USERS_KEY = 'gas-control-users-v1'
@@ -16,6 +24,8 @@ export function createDefaultGasState(today = formatDateInput(new Date())) {
     manual: createManualFields({ startedAt: today, endedAt: today }),
     lastFinishedCycle: null,
     reminder: { enabled: false, scheduledFor: '' },
+    currentBrand: normalizeBrand(DEFAULT_GAS_BRAND),
+    inventory: { reserveAvailable: false, reserveBrand: null },
   }
 }
 
@@ -37,6 +47,20 @@ export function normalizeGasState(nextState, today = formatDateInput(new Date())
     manual: restoredManual,
     lastFinishedCycle: nextState?.lastFinishedCycle || null,
     reminder: nextState?.reminder || { enabled: false, scheduledFor: '' },
+    currentBrand: normalizeBrand(nextState?.currentBrand),
+    inventory: {
+      reserveAvailable: Boolean(nextState?.inventory?.reserveAvailable),
+      reserveBrand: nextState?.inventory?.reserveBrand ? normalizeBrand(nextState.inventory.reserveBrand) : null,
+    },
+  }
+}
+
+function normalizeResidenceProfile(user, today) {
+  return {
+    city: user.city || user.residenceProfile?.city || '',
+    state: user.stateCode || user.residenceProfile?.state || '',
+    avatar: user.avatar || user.residenceProfile?.avatar || '',
+    updatedAt: user.residenceProfile?.updatedAt || today,
   }
 }
 
@@ -69,12 +93,18 @@ function createSeedUsers(today) {
     {
       id: 'casa-demo',
       name: 'Casa Demo',
-      homeName: 'Casa Demo',
+      homeName: 'Casa Adriano',
       email: DEMO_USER_EMAIL,
       password: DEMO_USER_PASSWORD,
       role: 'user',
       state: migrateLegacyState(today),
       theme: 'realistic',
+      residenceProfile: {
+        city: 'São Paulo',
+        state: 'SP',
+        avatar: '',
+        updatedAt: today,
+      },
       createdAt: today,
     },
   ]
@@ -95,6 +125,9 @@ export function loadUsers() {
         role: user.role === 'admin' ? 'admin' : 'user',
         state: user.role === 'admin' ? null : normalizeGasState(user.state, today),
         theme: user.theme || 'realistic',
+        residenceProfile: user.role === 'admin'
+          ? null
+          : normalizeResidenceProfile(user, today),
         createdAt: user.createdAt || today,
       })).filter((user) => user.id && user.email)
     }
@@ -139,6 +172,12 @@ export function createUser({ name, homeName, email, password }) {
     role: 'user',
     state: createDefaultGasState(today),
     theme: 'realistic',
+    residenceProfile: {
+      city: '',
+      state: '',
+      avatar: '',
+      updatedAt: today,
+    },
     createdAt: today,
   }
 }

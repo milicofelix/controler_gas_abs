@@ -3,8 +3,12 @@ import { LocalNotifications } from '@capacitor/local-notifications'
 import {
   DEFAULT_CYCLE_DAYS,
   GAS_REMINDER_NOTIFICATION_ID,
+  GAS_BRANDS,
   MOVING_AVERAGE_LIMIT,
   averageDuration,
+  calculateBrandStats,
+  calculateConsumptionStats,
+  calculateFinancialStats,
   calculateStats,
   createHistoryEntry,
   createManualFields,
@@ -15,6 +19,8 @@ import {
   formatMoney,
   getAlert,
   getReminderDate,
+  getSmartAlerts,
+  normalizeBrand,
 } from './gasMath'
 import {
   DEMO_USER_EMAIL,
@@ -43,6 +49,14 @@ const THEME_OPTIONS = [
 function getThemeOption(themeId) {
   return THEME_OPTIONS.find((theme) => theme.id === themeId) || THEME_OPTIONS[0]
 }
+
+const PAGE_OPTIONS = [
+  { id: 'home', label: 'Início', icon: '⌂' },
+  { id: 'history', label: 'Histórico', icon: '↺' },
+  { id: 'stats', label: 'Análises', icon: '▥' },
+  { id: 'alerts', label: 'Alertas', icon: '♧' },
+  { id: 'profile', label: 'Perfil', icon: '♙' },
+]
 
 const STATUS_STEPS = [
   { label: 'Cheio', tone: 'full' },
@@ -85,6 +99,52 @@ function getUserStats(user, today = formatDateInput(new Date())) {
   })
 
   return { state, intelligence, stats }
+}
+
+function getBrandInitials(name) {
+  return String(name || 'Gás')
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+}
+
+function BrandLogo({ brand, className = '' }) {
+  const normalizedBrand = normalizeBrand(brand)
+
+  if (normalizedBrand.logo) {
+    return <img className={`brand-logo ${className}`} src={normalizedBrand.logo} alt={normalizedBrand.name} />
+  }
+
+  return (
+    <span className={`brand-logo fallback ${className}`} aria-hidden="true">
+      {getBrandInitials(normalizedBrand.name)}
+    </span>
+  )
+}
+
+function ProfileAvatar({ user }) {
+  const avatar = user.residenceProfile?.avatar
+
+  if (avatar) {
+    return <img className="profile-avatar" src={avatar} alt={user.name} />
+  }
+
+  return <span className="profile-avatar fallback" aria-hidden="true">{getBrandInitials(user.name)}</span>
+}
+
+function readImageFile(file, onSuccess, onError) {
+  if (!file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    onError('Use uma imagem JPG, PNG ou WEBP.')
+    return
+  }
+
+  const reader = new FileReader()
+
+  reader.onload = () => onSuccess(String(reader.result || ''))
+  reader.onerror = () => onError('Não foi possível carregar a imagem.')
+  reader.readAsDataURL(file)
 }
 
 function CylinderGauge({ percent, tone }) {
@@ -242,10 +302,18 @@ function AdminDashboard({ users, onLogout }) {
     .map((user) => ({ user, ...getUserStats(user, today) }))
   const criticalCount = userRows.filter((row) => row.stats.percent <= 10).length
   const lowCount = userRows.filter((row) => row.stats.percent > 10 && row.stats.percent <= 25).length
+  const riskCount = criticalCount + lowCount
+  const staleCount = userRows.filter((row) => row.stats.elapsedDays > row.intelligence.projectedCycleDays + 7).length
   const totalCycles = userRows.reduce((sum, row) => sum + row.state.history.length, 0)
   const averagePercent = userRows.length
     ? Math.round(userRows.reduce((sum, row) => sum + row.stats.percent, 0) / userRows.length)
     : 0
+  const allHistory = userRows.flatMap((row) => row.state.history)
+  const adminBrandStats = calculateBrandStats(allHistory)
+  const adminFinancialStats = calculateFinancialStats(allHistory)
+  const mostUsedBrand = adminBrandStats
+    .slice()
+    .sort((a, b) => b.cycles - a.cycles)[0]
 
   return (
     <main className="app-shell admin-shell">
@@ -263,21 +331,65 @@ function AdminDashboard({ users, onLogout }) {
 
       <section className="admin-metrics">
         <article>
-          <span>Casas</span>
+          <span>Total de casas</span>
           <strong>{userRows.length}</strong>
         </article>
         <article>
-          <span>Média geral</span>
+          <span>Casas em risco</span>
+          <strong>{riskCount}</strong>
+        </article>
+        <article>
+          <span>Sem atualização</span>
+          <strong>{staleCount}</strong>
+        </article>
+        <article>
+          <span>Nível médio</span>
           <strong>{averagePercent}%</strong>
         </article>
+      </section>
+
+      <section className="admin-metrics">
         <article>
-          <span>Baixo</span>
-          <strong>{lowCount}</strong>
+          <span>Marca mais usada</span>
+          <strong>{mostUsedBrand?.name || 'Sem dados'}</strong>
         </article>
         <article>
-          <span>Crítico</span>
-          <strong>{criticalCount}</strong>
+          <span>Média por marca</span>
+          <strong>{adminBrandStats[0]?.averageDuration || 0} dias</strong>
         </article>
+        <article>
+          <span>Valor médio</span>
+          <strong>{adminFinancialStats.averagePaid ? formatMoney(adminFinancialStats.averagePaid) : 'R$ 0,00'}</strong>
+        </article>
+        <article>
+          <span>Gasto anual</span>
+          <strong>{adminFinancialStats.annualSpend ? formatMoney(adminFinancialStats.annualSpend) : 'R$ 0,00'}</strong>
+        </article>
+      </section>
+
+      <section className="history-card admin-card">
+        <div className="history-header">
+          <div>
+            <span className="eyebrow">Marcas</span>
+            <h2>Consumo por marca</h2>
+          </div>
+        </div>
+
+        <div className="brand-ranking">
+          {adminBrandStats.map((brand) => (
+            <article key={brand.name}>
+              <BrandLogo brand={brand} />
+              <div>
+                <strong>{brand.name}</strong>
+                <span>{brand.cycles} ciclos • média de {brand.averageDuration} dias</span>
+              </div>
+            </article>
+          ))}
+
+          {adminBrandStats.length === 0 && (
+            <div className="empty-state">Nenhum ciclo registrado por marca ainda.</div>
+          )}
+        </div>
       </section>
 
       <section className="history-card admin-card">
@@ -298,7 +410,12 @@ function AdminDashboard({ users, onLogout }) {
               <div className="admin-user-main">
                 <div>
                   <strong>{user.homeName}</strong>
-                  <span>{user.name} • {user.email} • {getThemeOption(user.theme).name}</span>
+                  <span>
+                    {user.residenceProfile?.city || 'Cidade não informada'}
+                    {user.residenceProfile?.state ? `/${user.residenceProfile.state}` : ''}
+                    {' • '}
+                    {user.name} • {user.email} • {getThemeOption(user.theme).name}
+                  </span>
                 </div>
                 <div className={`status-pill ${stats.status.tone}`}>{stats.status.label}</div>
               </div>
@@ -313,6 +430,7 @@ function AdminDashboard({ users, onLogout }) {
                 <span>Acaba em: <strong>{formatDisplayDate(stats.expectedEnd)}</strong></span>
                 <span>Média: <strong>{intelligence.projectedCycleDays} dias</strong></span>
                 <span>Trocas: <strong>{state.history.length}</strong></span>
+                <span>Marca: <strong>{state.currentBrand?.name || 'Ultragaz'}</strong></span>
                 <span>Recomendação: <strong>{stats.recommendation}</strong></span>
               </div>
             </article>
@@ -328,6 +446,7 @@ function AdminDashboard({ users, onLogout }) {
 }
 
 function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout }) {
+  const [activePage, setActivePage] = useState('home')
   const [state, setState] = useState(() => normalizeGasState(currentUser.state))
   const [notificationStatus, setNotificationStatus] = useState('')
   const [settingsStatus, setSettingsStatus] = useState('')
@@ -336,8 +455,12 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
     homeName: currentUser.homeName || '',
     email: currentUser.email || '',
     password: currentUser.password || '',
+    city: currentUser.residenceProfile?.city || '',
+    state: currentUser.residenceProfile?.state || '',
+    avatar: currentUser.residenceProfile?.avatar || '',
   }))
   const currentTheme = getThemeOption(currentUser.theme)
+  const currentBrand = normalizeBrand(state.currentBrand)
 
   const today = formatDateInput(new Date())
 
@@ -350,6 +473,22 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
   }), [state.startedAt, intelligence.projectedCycleDays, today])
 
   const visualAlert = getAlert(stats.percent)
+  const smartAlerts = useMemo(() => getSmartAlerts({
+    stats,
+    reserveAvailable: state.inventory?.reserveAvailable,
+  }), [state.inventory?.reserveAvailable, stats])
+
+  const pageTitle = PAGE_OPTIONS.find((page) => page.id === activePage)?.label || 'Início'
+  const brandStats = useMemo(() => calculateBrandStats(state.history), [state.history])
+  const consumptionStats = useMemo(() => calculateConsumptionStats(state.history), [state.history])
+  const financialStats = useMemo(() => calculateFinancialStats(state.history), [state.history])
+  const durationSeries = useMemo(() => state.history.slice(0, 6).reverse(), [state.history])
+  const maxDuration = Math.max(1, ...durationSeries.map((cycle) => cycle.duration))
+  const priceSeries = useMemo(() => state.history
+    .filter((cycle) => Number(cycle.paidValue) > 0)
+    .slice(0, 6)
+    .reverse(), [state.history])
+  const maxPrice = Math.max(1, ...priceSeries.map((cycle) => Number(cycle.paidValue)))
 
   const historyStats = useMemo(() => {
     if (state.history.length === 0) {
@@ -392,6 +531,11 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
       homeName,
       email,
       password,
+      residenceProfile: {
+        city: profileForm.city.trim(),
+        state: profileForm.state.trim().toUpperCase(),
+        avatar: profileForm.avatar,
+      },
     })
 
     if (!result.ok) {
@@ -416,6 +560,80 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
     }))
   }
 
+  function updateCurrentBrand(nextBrand) {
+    setState((current) => ({
+      ...current,
+      currentBrand: normalizeBrand(nextBrand),
+    }))
+  }
+
+  function updateBrandFromSelect(brandId) {
+    const nextBrand = GAS_BRANDS.find((brand) => brand.id === brandId) || GAS_BRANDS[0]
+    updateCurrentBrand({
+      id: nextBrand.id,
+      name: nextBrand.id === 'outra' ? currentBrand.name : nextBrand.name,
+      logo: nextBrand.id === currentBrand.id ? currentBrand.logo : '',
+    })
+  }
+
+  function updateCustomBrandName(value) {
+    setState((current) => ({
+      ...current,
+      currentBrand: normalizeBrand({
+        ...current.currentBrand,
+        id: 'outra',
+        name: value,
+      }),
+    }))
+  }
+
+  function uploadBrandLogo(event) {
+    const file = event.target.files?.[0]
+
+    readImageFile(
+      file,
+      (logo) => {
+        setState((current) => ({
+          ...current,
+          currentBrand: normalizeBrand({ ...current.currentBrand, logo }),
+        }))
+        setSettingsStatus('Logo da marca atualizado.')
+        event.target.value = ''
+      },
+      (message) => {
+        setSettingsStatus(message)
+        event.target.value = ''
+      },
+    )
+  }
+
+  function uploadProfileAvatar(event) {
+    const file = event.target.files?.[0]
+
+    readImageFile(
+      file,
+      (avatar) => {
+        setProfileForm((current) => ({ ...current, avatar }))
+        setSettingsStatus('Foto carregada. Salve o cadastro para persistir.')
+        event.target.value = ''
+      },
+      (message) => {
+        setSettingsStatus(message)
+        event.target.value = ''
+      },
+    )
+  }
+
+  function toggleReserveAvailability() {
+    setState((current) => ({
+      ...current,
+      inventory: {
+        reserveAvailable: !current.inventory?.reserveAvailable,
+        reserveBrand: !current.inventory?.reserveAvailable ? normalizeBrand(current.currentBrand) : null,
+      },
+    }))
+  }
+
   function updateManualField(field, value) {
     setState((current) => ({
       ...current,
@@ -435,6 +653,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
       duration,
       paidValue: state.manual?.paidValue || '',
       notes: state.manual?.notes || '',
+      brand: currentBrand,
     })
     const nextHistory = [lastFinishedCycle, ...state.history].slice(0, 8)
 
@@ -444,6 +663,8 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
       history: nextHistory,
       manual: createManualFields({ startedAt: endedAt, endedAt }),
       lastFinishedCycle,
+      currentBrand,
+      inventory: state.inventory || { reserveAvailable: false, reserveBrand: null },
       reminder: { enabled: false, scheduledFor: '' },
     })
 
@@ -476,6 +697,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
         homeName: currentUser.homeName,
         email: currentUser.email,
         theme: currentUser.theme,
+        residenceProfile: currentUser.residenceProfile,
       },
       data: state,
     }
@@ -587,6 +809,13 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
         </div>
       </section>
 
+      <section className="page-heading">
+        <span className="eyebrow">Página atual</span>
+        <h2>{pageTitle}</h2>
+      </section>
+
+      {activePage === 'home' && (
+        <>
       <section className={`dashboard-card ${stats.status.tone}`}>
         <div className="dashboard-decoration kitchen" aria-hidden="true">
           <span></span><span></span><span></span>
@@ -631,6 +860,26 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
         </article>
       </section>
 
+      <section className="brand-dashboard-card">
+        <div>
+          <span className="eyebrow">Botijão atual</span>
+          <h2>{currentBrand.name}</h2>
+          <p>Compra/instalação: {formatDisplayDate(state.startedAt)}</p>
+        </div>
+        <BrandLogo brand={currentBrand} className="large" />
+      </section>
+
+      <section className="stock-card">
+        <div>
+          <span className="eyebrow">Estoque</span>
+          <h2>Botijão reserva</h2>
+          <p>{state.inventory?.reserveAvailable ? 'Reserva disponível para troca.' : 'Nenhum reserva cadastrado.'}</p>
+        </div>
+        <button type="button" onClick={toggleReserveAvailability}>
+          {state.inventory?.reserveAvailable ? 'Marcar sem reserva' : 'Tenho reserva'}
+        </button>
+      </section>
+
       <section className={`intelligence-card ${intelligence.pattern.tone}`}>
         <div className="intelligence-header">
           <div>
@@ -671,16 +920,89 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
         </div>
       </section>
 
-      {visualAlert && (
-        <section className={`alert-card ${visualAlert.tone}`}>
+      <section className="quick-actions-card">
+        <button type="button" className="primary" onClick={() => setActivePage('history')}>Registrar troca</button>
+        <button type="button" onClick={() => setActivePage('alerts')}>Ver alertas</button>
+      </section>
+        </>
+      )}
+
+      {activePage === 'alerts' && (
+        <>
+      <section className="smart-alert-list">
+        {smartAlerts.map((alert) => (
+          <article key={alert.title} className={`alert-card ${alert.tone}`}>
+            <div>
+              <span className="eyebrow">Alerta inteligente</span>
+              <h2>{alert.title}</h2>
+              <p>{alert.message}</p>
+            </div>
+          </article>
+        ))}
+      </section>
+
+      {!visualAlert && (
+        <section className="alert-card ok">
           <div>
             <span className="eyebrow">Alertas</span>
-            <h2>{visualAlert.title}</h2>
-            <p>{visualAlert.message}</p>
+            <h2>Nenhum alerta crítico agora</h2>
+            <p>O botijão está dentro do nível esperado. Você ainda pode ativar o lembrete de compra.</p>
           </div>
         </section>
       )}
 
+      {state.inventory?.reserveAvailable && stats.percent <= 10 && (
+        <section className="stock-card critical">
+          <div>
+            <span className="eyebrow">Ação recomendada</span>
+            <h2>Troque pelo reserva</h2>
+            <p>Depois da troca, compre um novo botijão para voltar a ter estoque de segurança.</p>
+          </div>
+          <button type="button" className="primary" onClick={toggleReserveAvailability}>
+            Usei o reserva
+          </button>
+        </section>
+      )}
+
+      <section className={`intelligence-card ${intelligence.pattern.tone}`}>
+        <div className="intelligence-header">
+          <div>
+            <span className="eyebrow">Lembrete</span>
+            <h2>{stats.recommendation}</h2>
+          </div>
+          <div className="intelligence-badge">
+            {intelligence.isUsingRealAverage ? 'Média real' : 'Base inicial'}
+          </div>
+        </div>
+
+        <div className="intelligence-grid">
+          <article>
+            <span>Comprar em</span>
+            <strong>{stats.buyInDays} dias</strong>
+          </article>
+          <article>
+            <span>Previsão</span>
+            <strong>{formatDisplayDate(stats.expectedEnd)}</strong>
+          </article>
+        </div>
+
+        <div className="reminder-actions">
+          <button type="button" className="primary" onClick={scheduleBuyReminder}>
+            Ativar lembrete de compra
+          </button>
+
+          {(notificationStatus || state.reminder?.enabled) && (
+            <span>
+              {notificationStatus || `Lembrete ativo para ${formatDisplayDate(state.reminder.scheduledFor)}.`}
+            </span>
+          )}
+        </div>
+      </section>
+        </>
+      )}
+
+      {activePage === 'history' && (
+        <>
       <section className="form-card">
         <div className="form-header">
           <span className="eyebrow">Controle manual</span>
@@ -729,6 +1051,41 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
           />
         </label>
 
+        <div className="brand-form-panel">
+          <div className="brand-form-header">
+            <div>
+              <span className="eyebrow">Marca do gás</span>
+              <strong>{currentBrand.name}</strong>
+            </div>
+            <BrandLogo brand={currentBrand} />
+          </div>
+
+          <label>
+            Marca atual
+            <select value={currentBrand.id} onChange={(event) => updateBrandFromSelect(event.target.value)}>
+              {GAS_BRANDS.map((brand) => (
+                <option key={brand.id} value={brand.id}>{brand.name}</option>
+              ))}
+            </select>
+          </label>
+
+          {currentBrand.id === 'outra' && (
+            <label>
+              Nome da marca
+              <input
+                value={currentBrand.name}
+                placeholder="Ex.: Marca regional"
+                onChange={(event) => updateCustomBrandName(event.target.value)}
+              />
+            </label>
+          )}
+
+          <label className="file-action compact">
+            Upload do logo
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadBrandLogo} />
+          </label>
+        </div>
+
         <div className="actions">
           <button type="button" className="primary" onClick={registerCylinderChange}>
             Registrar troca
@@ -765,6 +1122,11 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
                   <span>{formatDisplayDate(cycle.installedAt)} até {formatDisplayDate(cycle.endedAt)}</span>
                 </div>
 
+                <div className="history-brand">
+                  <BrandLogo brand={{ name: cycle.brandName, logo: cycle.brandLogo }} />
+                  <span>{cycle.brandName || 'Marca não informada'}</span>
+                </div>
+
                 {(cycle.paidValue || cycle.notes) && (
                   <div className="history-meta">
                     {cycle.paidValue && <span>{formatMoney(cycle.paidValue)}</span>}
@@ -776,7 +1138,119 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
           </div>
         </section>
       )}
+        </>
+      )}
 
+      {activePage === 'stats' && (
+        <>
+          <section className="metrics-grid stats-grid">
+            <article>
+              <span>Média geral</span>
+              <strong>{consumptionStats.averageDuration} dias</strong>
+            </article>
+            <article>
+              <span>Menor duração</span>
+              <strong>{consumptionStats.shortestDuration} dias</strong>
+            </article>
+            <article>
+              <span>Maior duração</span>
+              <strong>{consumptionStats.longestDuration} dias</strong>
+            </article>
+            <article>
+              <span>Consumo anual</span>
+              <strong>{consumptionStats.annualConsumption} botijões</strong>
+            </article>
+          </section>
+
+          <section className="metrics-grid stats-grid">
+            <article>
+              <span>Valor médio</span>
+              <strong>{financialStats.averagePaid ? formatMoney(financialStats.averagePaid) : 'R$ 0,00'}</strong>
+            </article>
+            <article>
+              <span>Gasto mensal</span>
+              <strong>{financialStats.monthlySpend ? formatMoney(financialStats.monthlySpend) : 'R$ 0,00'}</strong>
+            </article>
+            <article>
+              <span>Gasto anual</span>
+              <strong>{financialStats.annualSpend ? formatMoney(financialStats.annualSpend) : 'R$ 0,00'}</strong>
+            </article>
+            <article>
+              <span>Evolução</span>
+              <strong>{financialStats.priceDelta ? formatMoney(financialStats.priceDelta) : 'R$ 0,00'}</strong>
+            </article>
+          </section>
+
+          <section className="history-card">
+            <div className="history-header">
+              <div>
+                <span className="eyebrow">Gráficos</span>
+                <h2>Histórico de duração</h2>
+              </div>
+            </div>
+
+            <div className="chart-list">
+              {durationSeries.map((cycle) => (
+                <div key={cycle.id} className="chart-row">
+                  <span>{formatDisplayDate(cycle.endedAt)}</span>
+                  <div><i style={{ width: `${Math.max(8, (cycle.duration / maxDuration) * 100)}%` }}></i></div>
+                  <strong>{cycle.duration}d</strong>
+                </div>
+              ))}
+
+              {durationSeries.length === 0 && <div className="empty-state">Registre ciclos para ver o gráfico.</div>}
+            </div>
+          </section>
+
+          <section className="history-card">
+            <div className="history-header">
+              <div>
+                <span className="eyebrow">Custos</span>
+                <h2>Histórico de preços</h2>
+              </div>
+            </div>
+
+            <div className="chart-list price">
+              {priceSeries.map((cycle) => (
+                <div key={cycle.id} className="chart-row">
+                  <span>{formatDisplayDate(cycle.endedAt)}</span>
+                  <div><i style={{ width: `${Math.max(8, (Number(cycle.paidValue) / maxPrice) * 100)}%` }}></i></div>
+                  <strong>{formatMoney(cycle.paidValue)}</strong>
+                </div>
+              ))}
+
+              {priceSeries.length === 0 && <div className="empty-state">Informe valores pagos para ver a evolução.</div>}
+            </div>
+          </section>
+
+          <section className="history-card">
+            <div className="history-header">
+              <div>
+                <span className="eyebrow">Marcas</span>
+                <h2>Comparativo de marcas</h2>
+              </div>
+            </div>
+
+            <div className="brand-ranking">
+              {brandStats.map((brand) => (
+                <article key={brand.name}>
+                  <BrandLogo brand={brand} />
+                  <div>
+                    <strong>{brand.name}</strong>
+                    <span>
+                      Média {brand.averageDuration} dias • menor {brand.shortestDuration} • maior {brand.longestDuration}
+                    </span>
+                  </div>
+                </article>
+              ))}
+
+              {brandStats.length === 0 && <div className="empty-state">Registre trocas para comparar marcas.</div>}
+            </div>
+          </section>
+        </>
+      )}
+
+      {activePage === 'profile' && (
       <section className="settings-card">
         <div className="settings-header">
           <div>
@@ -815,6 +1289,20 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
         </div>
 
         <form className="profile-form" onSubmit={saveProfile}>
+          <div className="profile-avatar-panel">
+            {profileForm.avatar
+              ? <img className="profile-avatar large" src={profileForm.avatar} alt={profileForm.name || 'Perfil'} />
+              : <ProfileAvatar user={{ ...currentUser, name: profileForm.name, residenceProfile: { avatar: '' } }} />}
+            <div>
+              <span className="eyebrow">Foto do perfil</span>
+              <strong>{profileForm.homeName || currentUser.homeName}</strong>
+              <label className="file-action compact">
+                Upload de foto
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadProfileAvatar} />
+              </label>
+            </div>
+          </div>
+
           <label>
             Nome do responsável
             <input
@@ -825,11 +1313,30 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
           </label>
 
           <label>
-            Nome do local
+            Nome da residência
             <input
               value={profileForm.homeName}
               onChange={(event) => updateProfileField('homeName', event.target.value)}
               placeholder="Ex.: Minha casa"
+            />
+          </label>
+
+          <label>
+            Cidade
+            <input
+              value={profileForm.city}
+              onChange={(event) => updateProfileField('city', event.target.value)}
+              placeholder="Ex.: São Paulo"
+            />
+          </label>
+
+          <label>
+            Estado
+            <input
+              value={profileForm.state}
+              maxLength="2"
+              onChange={(event) => updateProfileField('state', event.target.value.toUpperCase())}
+              placeholder="SP"
             />
           </label>
 
@@ -860,6 +1367,14 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
             <strong>{currentUser.name}</strong>
           </article>
           <article>
+            <span>Residência</span>
+            <strong>
+              {currentUser.homeName}
+              {currentUser.residenceProfile?.city && ` • ${currentUser.residenceProfile.city}`}
+              {currentUser.residenceProfile?.state && `/${currentUser.residenceProfile.state}`}
+            </strong>
+          </article>
+          <article>
             <span>Ciclos salvos</span>
             <strong>{historyStats.totalCycles}</strong>
           </article>
@@ -886,12 +1401,20 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
           </div>
         )}
       </section>
+      )}
 
-      <nav className="bottom-nav" aria-label="Navegação principal visual">
-        <span className="active">⌂<small>Início</small></span>
-        <span>↺<small>Histórico</small></span>
-        <span>♧<small>Alertas</small></span>
-        <span>♙<small>Perfil</small></span>
+      <nav className="bottom-nav" aria-label="Navegação principal">
+        {PAGE_OPTIONS.map((page) => (
+          <button
+            key={page.id}
+            type="button"
+            className={activePage === page.id ? 'active' : ''}
+            onClick={() => setActivePage(page.id)}
+          >
+            <span>{page.icon}</span>
+            <small>{page.label}</small>
+          </button>
+        ))}
       </nav>
     </main>
   )
@@ -946,6 +1469,12 @@ function App() {
             homeName: profile.homeName.trim(),
             email: normalizedEmail,
             password: profile.password.trim(),
+            residenceProfile: {
+              city: profile.residenceProfile?.city || '',
+              state: profile.residenceProfile?.state || '',
+              avatar: profile.residenceProfile?.avatar || '',
+              updatedAt: formatDateInput(new Date()),
+            },
           }
         : user
     )))
