@@ -63,6 +63,7 @@ function createSeedUsers(today) {
       password: SUPER_ADMIN_PASSWORD,
       role: 'admin',
       state: null,
+      theme: 'dark-premium',
       createdAt: today,
     },
     {
@@ -73,6 +74,7 @@ function createSeedUsers(today) {
       password: DEMO_USER_PASSWORD,
       role: 'user',
       state: migrateLegacyState(today),
+      theme: 'realistic',
       createdAt: today,
     },
   ]
@@ -92,6 +94,7 @@ export function loadUsers() {
         password: user.password || '',
         role: user.role === 'admin' ? 'admin' : 'user',
         state: user.role === 'admin' ? null : normalizeGasState(user.state, today),
+        theme: user.theme || 'realistic',
         createdAt: user.createdAt || today,
       })).filter((user) => user.id && user.email)
     }
@@ -135,6 +138,7 @@ export function createUser({ name, homeName, email, password }) {
     password,
     role: 'user',
     state: createDefaultGasState(today),
+    theme: 'realistic',
     createdAt: today,
   }
 }

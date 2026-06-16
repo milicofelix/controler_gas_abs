@@ -32,6 +32,18 @@ import {
 } from './authStorage'
 import './App.css'
 
+
+const THEME_OPTIONS = [
+  { id: 'realistic', name: 'Botijão Realista', description: 'Medidor físico com botijão em destaque.' },
+  { id: 'blue-modern', name: 'Azul Moderno', description: 'Leve, claro e com cara de app financeiro.' },
+  { id: 'dark-premium', name: 'Escuro Premium', description: 'Visual noturno, premium e otimizado para OLED.' },
+  { id: 'green-clean', name: 'Verde Clean', description: 'Tema doméstico, suave e inspirado em cozinha.' },
+]
+
+function getThemeOption(themeId) {
+  return THEME_OPTIONS.find((theme) => theme.id === themeId) || THEME_OPTIONS[0]
+}
+
 const STATUS_STEPS = [
   { label: 'Cheio', tone: 'full' },
   { label: 'Médio', tone: 'medium' },
@@ -79,20 +91,35 @@ function CylinderGauge({ percent, tone }) {
   const fillHeight = `${percent}%`
 
   return (
-    <div className={`cylinder-wrap ${tone}`} aria-label={`Botijão com ${percent}% de gás estimado`}>
-      <div className="cylinder-neck"></div>
-      <div className="cylinder-handle">
-        <span></span>
+    <div className={`cylinder-stage ${tone}`}>
+      <div className="gauge-arc" aria-hidden="true">
+        <span className="arc-fill"></span>
+        <small className="arc-start">0%</small>
+        <small className="arc-end">100%</small>
       </div>
-      <div className="cylinder-body">
-        <div className="cylinder-fill" style={{ height: fillHeight }}></div>
-        <div className="cylinder-shine"></div>
-        <div className="cylinder-label">
-          <strong>P13</strong>
-          <small>13kg</small>
+
+      <div className={`cylinder-wrap ${tone}`} aria-label={`Botijão com ${percent}% de gás estimado`}>
+        <div className="cylinder-top-ring"></div>
+        <div className="cylinder-neck"></div>
+        <div className="cylinder-handle">
+          <span></span>
+          <i></i>
         </div>
+        <div className="cylinder-body">
+          <div className="cylinder-inner-window">
+            <div className="cylinder-fill" style={{ height: fillHeight }}></div>
+            <div className="liquid-reflection"></div>
+          </div>
+          <div className="cylinder-shine"></div>
+          <div className="cylinder-label">
+            <strong>{percent}%</strong>
+            <small>P13 • 13kg</small>
+          </div>
+        </div>
+        <div className="cylinder-foot left"></div>
+        <div className="cylinder-foot right"></div>
+        <div className="cylinder-base"></div>
       </div>
-      <div className="cylinder-base"></div>
     </div>
   )
 }
@@ -271,7 +298,7 @@ function AdminDashboard({ users, onLogout }) {
               <div className="admin-user-main">
                 <div>
                   <strong>{user.homeName}</strong>
-                  <span>{user.name} • {user.email}</span>
+                  <span>{user.name} • {user.email} • {getThemeOption(user.theme).name}</span>
                 </div>
                 <div className={`status-pill ${stats.status.tone}`}>{stats.status.label}</div>
               </div>
@@ -300,10 +327,17 @@ function AdminDashboard({ users, onLogout }) {
   )
 }
 
-function UserHome({ currentUser, onUpdateUserState, onLogout }) {
+function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout }) {
   const [state, setState] = useState(() => normalizeGasState(currentUser.state))
   const [notificationStatus, setNotificationStatus] = useState('')
   const [settingsStatus, setSettingsStatus] = useState('')
+  const [profileForm, setProfileForm] = useState(() => ({
+    name: currentUser.name || '',
+    homeName: currentUser.homeName || '',
+    email: currentUser.email || '',
+    password: currentUser.password || '',
+  }))
+  const currentTheme = getThemeOption(currentUser.theme)
 
   const today = formatDateInput(new Date())
 
@@ -331,6 +365,42 @@ function UserHome({ currentUser, onUpdateUserState, onLogout }) {
   useEffect(() => {
     onUpdateUserState(currentUser.id, state)
   }, [currentUser.id, onUpdateUserState, state])
+
+
+  function updateProfileField(field, value) {
+    setProfileForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
+  }
+
+  function saveProfile(event) {
+    event.preventDefault()
+
+    const name = profileForm.name.trim()
+    const homeName = profileForm.homeName.trim()
+    const email = profileForm.email.trim().toLowerCase()
+    const password = profileForm.password.trim()
+
+    if (!name || !homeName || !email || password.length < 4) {
+      setSettingsStatus('Preencha responsável, local, e-mail e senha com pelo menos 4 caracteres.')
+      return
+    }
+
+    const result = onUpdateUserProfile(currentUser.id, {
+      name,
+      homeName,
+      email,
+      password,
+    })
+
+    if (!result.ok) {
+      setSettingsStatus(result.message)
+      return
+    }
+
+    setSettingsStatus('Cadastro atualizado.')
+  }
 
   function updateStartedAt(event) {
     const installedAt = event.target.value || today
@@ -405,6 +475,7 @@ function UserHome({ currentUser, onUpdateUserState, onLogout }) {
         name: currentUser.name,
         homeName: currentUser.homeName,
         email: currentUser.email,
+        theme: currentUser.theme,
       },
       data: state,
     }
@@ -495,7 +566,7 @@ function UserHome({ currentUser, onUpdateUserState, onLogout }) {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell user-shell ${currentTheme.id}`}>
       <section className="hero-card">
         <div className="hero-copy">
           <div className="brand-row">
@@ -517,11 +588,15 @@ function UserHome({ currentUser, onUpdateUserState, onLogout }) {
       </section>
 
       <section className={`dashboard-card ${stats.status.tone}`}>
+        <div className="dashboard-decoration kitchen" aria-hidden="true">
+          <span></span><span></span><span></span>
+        </div>
         <CylinderGauge percent={stats.percent} tone={stats.status.tone} />
 
         <div className="reading-panel">
-          <span className="reading-label">Nível estimado</span>
+          <span className="reading-label">Nível atual</span>
           <strong>{stats.percent}%</strong>
+          <div className={`mini-level ${stats.status.tone}`}>☻ Nível: {stats.status.label}</div>
           <p>{stats.status.message}</p>
 
           <div className={`progress-track ${stats.status.tone}`}>
@@ -706,9 +781,78 @@ function UserHome({ currentUser, onUpdateUserState, onLogout }) {
         <div className="settings-header">
           <div>
             <span className="eyebrow">Configurações</span>
-            <h2>Dados do app</h2>
+            <h2>Editar cadastro</h2>
           </div>
         </div>
+
+        <div className="theme-panel">
+          <div className="theme-panel-header">
+            <div>
+              <span className="eyebrow">Tema atual</span>
+              <strong>{currentTheme.name}</strong>
+            </div>
+            <span>{currentTheme.description}</span>
+          </div>
+
+          <div className="theme-grid" role="radiogroup" aria-label="Escolha do tema visual">
+            {THEME_OPTIONS.map((theme) => (
+              <button
+                key={theme.id}
+                type="button"
+                className={`theme-option ${theme.id} ${currentUser.theme === theme.id ? 'active' : ''}`}
+                onClick={() => onUpdateUserTheme(currentUser.id, theme.id)}
+                aria-pressed={currentUser.theme === theme.id}
+              >
+                <span className="theme-preview" aria-hidden="true">
+                  <i></i>
+                  <b></b>
+                </span>
+                <strong>{theme.name}</strong>
+                <small>{theme.description}</small>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <form className="profile-form" onSubmit={saveProfile}>
+          <label>
+            Nome do responsável
+            <input
+              value={profileForm.name}
+              onChange={(event) => updateProfileField('name', event.target.value)}
+              placeholder="Ex.: Adriano"
+            />
+          </label>
+
+          <label>
+            Nome do local
+            <input
+              value={profileForm.homeName}
+              onChange={(event) => updateProfileField('homeName', event.target.value)}
+              placeholder="Ex.: Minha casa"
+            />
+          </label>
+
+          <label>
+            E-mail de acesso
+            <input
+              type="email"
+              value={profileForm.email}
+              onChange={(event) => updateProfileField('email', event.target.value)}
+            />
+          </label>
+
+          <label>
+            Senha
+            <input
+              type="password"
+              value={profileForm.password}
+              onChange={(event) => updateProfileField('password', event.target.value)}
+            />
+          </label>
+
+          <button type="submit" className="primary">Salvar cadastro</button>
+        </form>
 
         <div className="settings-grid">
           <article>
@@ -718,6 +862,10 @@ function UserHome({ currentUser, onUpdateUserState, onLogout }) {
           <article>
             <span>Ciclos salvos</span>
             <strong>{historyStats.totalCycles}</strong>
+          </article>
+          <article>
+            <span>Tema</span>
+            <strong>{currentTheme.name}</strong>
           </article>
         </div>
 
@@ -738,6 +886,13 @@ function UserHome({ currentUser, onUpdateUserState, onLogout }) {
           </div>
         )}
       </section>
+
+      <nav className="bottom-nav" aria-label="Navegação principal visual">
+        <span className="active">⌂<small>Início</small></span>
+        <span>↺<small>Histórico</small></span>
+        <span>♧<small>Alertas</small></span>
+        <span>♙<small>Perfil</small></span>
+      </nav>
     </main>
   )
 }
@@ -755,6 +910,11 @@ function App() {
     saveUsers(users)
   }, [users])
 
+  useEffect(() => {
+    const theme = currentUser?.theme || 'realistic'
+    document.documentElement.dataset.theme = theme
+  }, [currentUser?.theme])
+
   function login(user) {
     const nextSession = { userId: user.id, role: user.role }
     setSession(nextSession)
@@ -768,6 +928,37 @@ function App() {
 
   function createNewUser(user) {
     setUsers((current) => [...current, user])
+  }
+
+  function updateUserProfile(userId, profile) {
+    const normalizedEmail = profile.email.trim().toLowerCase()
+    const emailAlreadyExists = users.some((user) => user.id !== userId && user.email === normalizedEmail)
+
+    if (emailAlreadyExists) {
+      return { ok: false, message: 'Já existe outro usuário com este e-mail.' }
+    }
+
+    setUsers((current) => current.map((user) => (
+      user.id === userId
+        ? {
+            ...user,
+            name: profile.name.trim(),
+            homeName: profile.homeName.trim(),
+            email: normalizedEmail,
+            password: profile.password.trim(),
+          }
+        : user
+    )))
+
+    return { ok: true, message: 'Cadastro atualizado.' }
+  }
+
+  function updateUserTheme(userId, themeId) {
+    const nextTheme = getThemeOption(themeId).id
+
+    setUsers((current) => current.map((user) => (
+      user.id === userId ? { ...user, theme: nextTheme } : user
+    )))
   }
 
   const updateUserState = useCallback((userId, nextState) => {
@@ -800,7 +991,16 @@ function App() {
     return <AdminDashboard users={users} onLogout={logout} />
   }
 
-  return <UserHome currentUser={currentUser} onUpdateUserState={updateUserState} onLogout={logout} />
+  return (
+    <UserHome
+      key={currentUser.id}
+      currentUser={currentUser}
+      onUpdateUserState={updateUserState}
+      onUpdateUserProfile={updateUserProfile}
+      onUpdateUserTheme={updateUserTheme}
+      onLogout={logout}
+    />
+  )
 }
 
 export default App
