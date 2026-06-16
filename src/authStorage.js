@@ -98,7 +98,7 @@ function createSeedUsers(today) {
       password: DEMO_USER_PASSWORD,
       role: 'user',
       state: migrateLegacyState(today),
-      theme: 'realistic',
+      theme: 'blue-modern',
       residenceProfile: {
         city: 'São Paulo',
         state: 'SP',
@@ -124,7 +124,7 @@ export function loadUsers() {
         password: user.password || '',
         role: user.role === 'admin' ? 'admin' : 'user',
         state: user.role === 'admin' ? null : normalizeGasState(user.state, today),
-        theme: user.theme || 'realistic',
+        theme: user.theme || 'blue-modern',
         residenceProfile: user.role === 'admin'
           ? null
           : normalizeResidenceProfile(user, today),
@@ -171,7 +171,7 @@ export function createUser({ name, homeName, email, password }) {
     password,
     role: 'user',
     state: createDefaultGasState(today),
-    theme: 'realistic',
+    theme: 'blue-modern',
     residenceProfile: {
       city: '',
       state: '',

@@ -387,6 +387,14 @@
   overflow-wrap: anywhere;
 }
 
+.metrics-grid small {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .form-card,
 .alert-card,
 .history-card,
@@ -656,8 +664,14 @@ button.ghost,
   font-size: 20px;
 }
 
+.brand-logo.uploaded {
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
 .brand-dashboard-card,
-.stock-card {
+.stock-card,
+.forecast-card {
   display: flex;
   justify-content: space-between;
   gap: 14px;
@@ -672,7 +686,8 @@ button.ghost,
 }
 
 .brand-dashboard-card h2,
-.stock-card h2 {
+.stock-card h2,
+.forecast-card h2 {
   margin: 6px 0 0;
   color: var(--text-strong);
   font-size: 24px;
@@ -680,10 +695,74 @@ button.ghost,
 }
 
 .brand-dashboard-card p,
-.stock-card p {
+.stock-card p,
+.forecast-card p {
   margin: 8px 0 0;
   color: var(--text-soft);
   line-height: 1.4;
+}
+
+.brand-dashboard-card p small {
+  display: block;
+  margin-top: 5px;
+  color: var(--primary-end);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.forecast-card {
+  min-height: 104px;
+}
+
+.forecast-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 78px;
+  height: 78px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, var(--card-bg) 48%, transparent 50%),
+    conic-gradient(var(--primary-end) calc(var(--gas-progress, 62) * 1%), color-mix(in srgb, var(--primary-end) 18%, transparent) 0);
+  box-shadow: inset 0 0 0 8px color-mix(in srgb, var(--primary-end) 14%, transparent);
+}
+
+.forecast-ring span {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  color: var(--primary-end);
+  background: color-mix(in srgb, var(--primary-end) 12%, transparent);
+  font-size: 20px;
+}
+
+.home-secondary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.home-secondary-grid .brand-dashboard-card,
+.home-secondary-grid .stock-card {
+  min-height: 100px;
+  margin-top: 0;
+  padding: 14px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.14);
+}
+
+.home-secondary-grid .brand-dashboard-card h2,
+.home-secondary-grid .stock-card h2 {
+  font-size: 18px;
+}
+
+.home-secondary-grid .brand-dashboard-card p,
+.home-secondary-grid .stock-card p {
+  font-size: 12px;
 }
 
 .stock-card button {
@@ -739,6 +818,52 @@ button.ghost,
   color: var(--text-strong);
   font-size: 20px;
   line-height: 1.1;
+}
+
+.brand-upload-box {
+  display: grid;
+  gap: 12px;
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  outline: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.brand-upload-box strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-strong);
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.brand-upload-box p {
+  margin: 7px 0 0;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.brand-upload-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.compact-button {
+  min-height: 42px;
+  border-radius: 16px;
+  font-size: 13px;
+}
+
+.brand-upload-status {
+  border-radius: 16px;
+  padding: 12px;
+  color: #d1fae5;
+  background: rgba(20, 184, 166, 0.14);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
 }
 
 .history-brand {
@@ -1052,6 +1177,10 @@ button.ghost,
 
   .chart-row {
     grid-template-columns: 72px 1fr 58px;
+  }
+
+  .brand-upload-actions {
+    grid-template-columns: 1fr;
   }
 
   .state-scale {
@@ -1637,8 +1766,19 @@ button.ghost,
 }
 
 .user-shell .hero-actions {
+  display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 16px;
+}
+
+.user-shell .hero-actions::before {
+  content: '♧';
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--text-soft);
+  font-size: 22px;
 }
 
 .user-shell .status-pill {
@@ -1654,6 +1794,7 @@ button.ghost,
   background: transparent;
   box-shadow: none;
   color: var(--text-soft);
+  font-size: 0;
 }
 
 .user-shell .logout-button::before {
@@ -1900,6 +2041,9 @@ button.ghost,
 
 :root[data-theme='blue-modern'] .metrics-grid article,
 :root[data-theme='blue-modern'] .intelligence-card,
+:root[data-theme='blue-modern'] .forecast-card,
+:root[data-theme='blue-modern'] .brand-dashboard-card,
+:root[data-theme='blue-modern'] .stock-card,
 :root[data-theme='blue-modern'] .form-card,
 :root[data-theme='blue-modern'] .history-card,
 :root[data-theme='blue-modern'] .settings-card {
@@ -1992,6 +2136,20 @@ button.ghost,
   background: rgba(15,23,42,.6);
 }
 
+:root[data-theme='dark-premium'] .forecast-card,
+:root[data-theme='dark-premium'] .brand-dashboard-card,
+:root[data-theme='dark-premium'] .stock-card {
+  margin-inline: 18px;
+  border-color: rgba(255,255,255,.08);
+  background: rgba(15,23,42,.58);
+  box-shadow: 0 22px 42px rgba(0,0,0,.34);
+}
+
+:root[data-theme='dark-premium'] .register-main-button {
+  color: #111827;
+  background: linear-gradient(135deg, #fde68a, #f59e0b);
+}
+
 :root[data-theme='dark-premium'] .metrics-grid article {
   border: 0;
   border-radius: 0;
@@ -2041,6 +2199,13 @@ button.ghost,
   position: absolute;
   left: 18px;
   top: 42px;
+}
+
+:root[data-theme='green-clean'] .hero-actions::before {
+  position: absolute;
+  right: 24px;
+  top: 42px;
+  color: #31572c;
 }
 
 :root[data-theme='green-clean'] .logout-button::before {
@@ -2128,6 +2293,19 @@ button.ghost,
   box-shadow: 0 16px 35px rgba(47,111,39,.12);
 }
 
+:root[data-theme='green-clean'] .forecast-card,
+:root[data-theme='green-clean'] .brand-dashboard-card,
+:root[data-theme='green-clean'] .stock-card {
+  margin-inline: 20px;
+  border: 0;
+  background: rgba(255,255,255,.72);
+  box-shadow: 0 16px 35px rgba(47,111,39,.12);
+}
+
+:root[data-theme='green-clean'] .register-main-button {
+  background: linear-gradient(135deg, #6aaa4a, #3f8d2f);
+}
+
 :root[data-theme='green-clean'] .metrics-grid article {
   border: 0;
   border-radius: 0;
@@ -2209,13 +2387,18 @@ button.ghost,
 
 .quick-actions-card {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 10px;
   margin-top: 16px;
 }
 
 .quick-actions-card button {
-  min-height: 48px;
+  min-height: 56px;
+}
+
+.register-main-button {
+  border-radius: 999px;
+  box-shadow: 0 18px 32px color-mix(in srgb, var(--primary-end) 22%, transparent);
 }
 
 .bottom-nav button {

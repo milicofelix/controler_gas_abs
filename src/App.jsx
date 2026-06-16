@@ -40,10 +40,10 @@ import './App.css'
 
 
 const THEME_OPTIONS = [
-  { id: 'realistic', name: 'Botijão Realista', description: 'Medidor físico com botijão em destaque.' },
   { id: 'blue-modern', name: 'Azul Moderno', description: 'Leve, claro e com cara de app financeiro.' },
   { id: 'dark-premium', name: 'Escuro Premium', description: 'Visual noturno, premium e otimizado para OLED.' },
   { id: 'green-clean', name: 'Verde Clean', description: 'Tema doméstico, suave e inspirado em cozinha.' },
+  { id: 'realistic', name: 'Botijão Realista', description: 'Medidor físico com botijão em destaque.' },
 ]
 
 function getThemeOption(themeId) {
@@ -114,7 +114,13 @@ function BrandLogo({ brand, className = '' }) {
   const normalizedBrand = normalizeBrand(brand)
 
   if (normalizedBrand.logo) {
-    return <img className={`brand-logo ${className}`} src={normalizedBrand.logo} alt={normalizedBrand.name} />
+    return (
+      <img
+        className={`brand-logo uploaded ${className}`}
+        src={normalizedBrand.logo}
+        alt={`Logo ${normalizedBrand.name}`}
+      />
+    )
   }
 
   return (
@@ -137,6 +143,11 @@ function ProfileAvatar({ user }) {
 function readImageFile(file, onSuccess, onError) {
   if (!file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
     onError('Use uma imagem JPG, PNG ou WEBP.')
+    return
+  }
+
+  if (file.size > 1024 * 1024) {
+    onError('Use uma imagem de até 1 MB.')
     return
   }
 
@@ -450,6 +461,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
   const [state, setState] = useState(() => normalizeGasState(currentUser.state))
   const [notificationStatus, setNotificationStatus] = useState('')
   const [settingsStatus, setSettingsStatus] = useState('')
+  const [brandUploadStatus, setBrandUploadStatus] = useState('')
   const [profileForm, setProfileForm] = useState(() => ({
     name: currentUser.name || '',
     homeName: currentUser.homeName || '',
@@ -597,14 +609,22 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
           ...current,
           currentBrand: normalizeBrand({ ...current.currentBrand, logo }),
         }))
-        setSettingsStatus('Logo da marca atualizado.')
+        setBrandUploadStatus('Logo personalizado salvo.')
         event.target.value = ''
       },
       (message) => {
-        setSettingsStatus(message)
+        setBrandUploadStatus(message)
         event.target.value = ''
       },
     )
+  }
+
+  function removeBrandLogo() {
+    setState((current) => ({
+      ...current,
+      currentBrand: normalizeBrand({ ...current.currentBrand, logo: '' }),
+    }))
+    setBrandUploadStatus('Logo personalizado removido.')
   }
 
   function uploadProfileAvatar(event) {
@@ -795,7 +815,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
             <span className="brand-mark" aria-hidden="true">P13</span>
             <span className="eyebrow">{currentUser.homeName}</span>
           </div>
-          <h1>Botijão P13</h1>
+          <h1>Meu Gás</h1>
           <p>
             {intelligence.isUsingRealAverage
               ? `Previsão inteligente baseada na média móvel dos últimos ${intelligence.sampleSize} ciclos.`
@@ -809,10 +829,12 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
         </div>
       </section>
 
-      <section className="page-heading">
-        <span className="eyebrow">Página atual</span>
-        <h2>{pageTitle}</h2>
-      </section>
+      {activePage !== 'home' && (
+        <section className="page-heading">
+          <span className="eyebrow">Página atual</span>
+          <h2>{pageTitle}</h2>
+        </section>
+      )}
 
       {activePage === 'home' && (
         <>
@@ -826,7 +848,11 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
           <span className="reading-label">Nível atual</span>
           <strong>{stats.percent}%</strong>
           <div className={`mini-level ${stats.status.tone}`}>☻ Nível: {stats.status.label}</div>
-          <p>{stats.status.message}</p>
+          <p>
+            {intelligence.isUsingRealAverage
+              ? 'Estimativa baseada no seu consumo médio'
+              : 'Estimativa baseada em consumo inicial'}
+          </p>
 
           <div className={`progress-track ${stats.status.tone}`}>
             <span style={{ width: `${stats.percent}%` }}></span>
@@ -855,74 +881,49 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
           <strong>{stats.remainingDays}</strong>
         </article>
         <article>
-          <span>Previsão de acabar</span>
-          <strong>{stats.expectedEnd.split('-').reverse().join('/')}</strong>
+          <span>Média de consumo</span>
+          <strong>{intelligence.projectedCycleDays}</strong>
+          <small>dias/botijão</small>
         </article>
       </section>
 
-      <section className="brand-dashboard-card">
+      <section className="forecast-card">
         <div>
-          <span className="eyebrow">Botijão atual</span>
-          <h2>{currentBrand.name}</h2>
-          <p>Compra/instalação: {formatDisplayDate(state.startedAt)}</p>
+          <span className="eyebrow">Previsão de término</span>
+          <h2>{formatDisplayDate(stats.expectedEnd)}</h2>
+          <p>Em ~{stats.remainingDays} dias</p>
         </div>
-        <BrandLogo brand={currentBrand} className="large" />
-      </section>
-
-      <section className="stock-card">
-        <div>
-          <span className="eyebrow">Estoque</span>
-          <h2>Botijão reserva</h2>
-          <p>{state.inventory?.reserveAvailable ? 'Reserva disponível para troca.' : 'Nenhum reserva cadastrado.'}</p>
-        </div>
-        <button type="button" onClick={toggleReserveAvailability}>
-          {state.inventory?.reserveAvailable ? 'Marcar sem reserva' : 'Tenho reserva'}
-        </button>
-      </section>
-
-      <section className={`intelligence-card ${intelligence.pattern.tone}`}>
-        <div className="intelligence-header">
-          <div>
-            <span className="eyebrow">Inteligência</span>
-            <h2>{stats.recommendation}</h2>
-          </div>
-          <div className="intelligence-badge">
-            {intelligence.isUsingRealAverage ? 'Média real' : 'Base inicial'}
-          </div>
-        </div>
-
-        <div className="intelligence-grid">
-          <article>
-            <span>Média móvel</span>
-            <strong>{intelligence.projectedCycleDays} dias</strong>
-          </article>
-          <article>
-            <span>Previsão</span>
-            <strong>{formatDisplayDate(stats.expectedEnd)}</strong>
-          </article>
-        </div>
-
-        <div className="pattern-note">
-          <strong>{intelligence.pattern.label}</strong>
-          <p>{intelligence.pattern.message}</p>
-        </div>
-
-        <div className="reminder-actions">
-          <button type="button" className="primary" onClick={scheduleBuyReminder}>
-            Ativar lembrete de compra
-          </button>
-
-          {(notificationStatus || state.reminder?.enabled) && (
-            <span>
-              {notificationStatus || `Lembrete ativo para ${formatDisplayDate(state.reminder.scheduledFor)}.`}
-            </span>
-          )}
+        <div className={`forecast-ring ${stats.status.tone}`} style={{ '--gas-progress': stats.percent }} aria-hidden="true">
+          <span>▣</span>
         </div>
       </section>
 
       <section className="quick-actions-card">
-        <button type="button" className="primary" onClick={() => setActivePage('history')}>Registrar troca</button>
-        <button type="button" onClick={() => setActivePage('alerts')}>Ver alertas</button>
+        <button type="button" className="primary register-main-button" onClick={() => setActivePage('history')}>
+          Registrar novo botijão
+        </button>
+      </section>
+
+      <section className="home-secondary-grid">
+        <article className="brand-dashboard-card">
+          <div>
+            <span className="eyebrow">Botijão atual</span>
+            <h2>{currentBrand.name}</h2>
+            <p>
+              Compra: {formatDisplayDate(state.startedAt)}
+              {currentBrand.logo && <small>Logo personalizado ativo</small>}
+            </p>
+          </div>
+          <BrandLogo brand={currentBrand} />
+        </article>
+
+        <article className="stock-card">
+          <div>
+            <span className="eyebrow">Reserva</span>
+            <h2>{state.inventory?.reserveAvailable ? 'Disponível' : 'Sem reserva'}</h2>
+            <p>{state.inventory?.reserveAvailable ? 'Pronto para troca.' : 'Cadastre se tiver dois botijões.'}</p>
+          </div>
+        </article>
       </section>
         </>
       )}
@@ -1057,7 +1058,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
               <span className="eyebrow">Marca do gás</span>
               <strong>{currentBrand.name}</strong>
             </div>
-            <BrandLogo brand={currentBrand} />
+            <BrandLogo brand={currentBrand} className="large" />
           </div>
 
           <label>
@@ -1080,10 +1081,32 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
             </label>
           )}
 
-          <label className="file-action compact">
-            Upload do logo
-            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadBrandLogo} />
-          </label>
+          <div className="brand-upload-box">
+            <div>
+              <span className="eyebrow">Logo personalizado</span>
+              <strong>{currentBrand.logo ? 'Preview ativo' : 'Avatar padrão'}</strong>
+              <p>Formatos aceitos: JPG, PNG ou WEBP até 1 MB.</p>
+            </div>
+
+            <div className="brand-upload-actions">
+              <label className="file-action compact">
+                Escolher logo
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadBrandLogo} />
+              </label>
+
+              {currentBrand.logo && (
+                <button type="button" className="ghost compact-button" onClick={removeBrandLogo}>
+                  Remover logo
+                </button>
+              )}
+            </div>
+          </div>
+
+          {brandUploadStatus && (
+            <div className="brand-upload-status" role="status">
+              {brandUploadStatus}
+            </div>
+          )}
         </div>
 
         <div className="actions">
@@ -1434,7 +1457,7 @@ function App() {
   }, [users])
 
   useEffect(() => {
-    const theme = currentUser?.theme || 'realistic'
+    const theme = currentUser?.theme || 'blue-modern'
     document.documentElement.dataset.theme = theme
   }, [currentUser?.theme])
 
