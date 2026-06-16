@@ -492,6 +492,13 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
 
   const pageTitle = PAGE_OPTIONS.find((page) => page.id === activePage)?.label || 'Início'
   const brandStats = useMemo(() => calculateBrandStats(state.history), [state.history])
+  const bestBrand = brandStats[0] || null
+  const shortestBrand = brandStats.length > 0
+    ? brandStats.reduce((shortest, brand) => (
+        brand.averageDuration < shortest.averageDuration ? brand : shortest
+      ), brandStats[0])
+    : null
+  const maxBrandAverage = Math.max(1, ...brandStats.map((brand) => brand.averageDuration))
   const consumptionStats = useMemo(() => calculateConsumptionStats(state.history), [state.history])
   const financialStats = useMemo(() => calculateFinancialStats(state.history), [state.history])
   const durationSeries = useMemo(() => state.history.slice(0, 6).reverse(), [state.history])
@@ -1249,20 +1256,39 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
           <section className="history-card">
             <div className="history-header">
               <div>
-                <span className="eyebrow">Marcas</span>
-                <h2>Comparativo de marcas</h2>
+                <span className="eyebrow">Histórico por marca</span>
+                <h2>Média por marca</h2>
               </div>
             </div>
+
+            {brandStats.length > 0 && (
+              <div className="brand-highlight-grid">
+                <article className="positive">
+                  <span>Durou mais</span>
+                  <strong>{bestBrand.name}</strong>
+                  <small>{bestBrand.averageDuration} dias em média</small>
+                </article>
+                <article className="warning">
+                  <span>Durou menos</span>
+                  <strong>{shortestBrand.name}</strong>
+                  <small>{shortestBrand.averageDuration} dias em média</small>
+                </article>
+              </div>
+            )}
 
             <div className="brand-ranking">
               {brandStats.map((brand) => (
                 <article key={brand.name}>
                   <BrandLogo brand={brand} />
-                  <div>
+                  <div className="brand-ranking-content">
                     <strong>{brand.name}</strong>
-                    <span>
+                    <span>{brand.cycles} ciclos • último em {formatDisplayDate(brand.lastCycleEndedAt)}</span>
+                    <div className="brand-duration-bar">
+                      <i style={{ width: `${Math.max(10, (brand.averageDuration / maxBrandAverage) * 100)}%` }}></i>
+                    </div>
+                    <small>
                       Média {brand.averageDuration} dias • menor {brand.shortestDuration} • maior {brand.longestDuration}
-                    </span>
+                    </small>
                   </div>
                 </article>
               ))}

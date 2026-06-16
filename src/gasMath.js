@@ -283,6 +283,7 @@ export function calculateBrandStats(history = []) {
       totalDuration: 0,
       shortestDuration: 0,
       longestDuration: 0,
+      lastCycleEndedAt: '',
       totalPaid: 0,
       paidCount: 0,
     }
@@ -294,6 +295,9 @@ export function calculateBrandStats(history = []) {
       ? Math.min(current.shortestDuration, entry.duration)
       : entry.duration
     current.longestDuration = Math.max(current.longestDuration, entry.duration)
+    current.lastCycleEndedAt = current.lastCycleEndedAt && current.lastCycleEndedAt > entry.endedAt
+      ? current.lastCycleEndedAt
+      : entry.endedAt
 
     if (Number.isFinite(paidValue) && paidValue > 0) {
       current.totalPaid += paidValue

@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   addDays,
   averageDuration,
+  calculateBrandStats,
   calculateStats,
   daysBetween,
   detectConsumptionPattern,
@@ -51,4 +52,20 @@ test('detecta consumo acima do padrao quando ultimo ciclo cai muito', () => {
 
   assert.equal(pattern.tone, 'warning')
   assert.equal(pattern.label, 'Consumo acima do padrão')
+})
+
+test('calcula ranking de duracao por marca', () => {
+  const stats = calculateBrandStats([
+    { duration: 36, paidValue: '120', brandName: 'Ultragaz', endedAt: '2026-06-01' },
+    { duration: 38, paidValue: '122', brandName: 'Ultragaz', endedAt: '2026-05-01' },
+    { duration: 32, paidValue: '118', brandName: 'Copagaz', endedAt: '2026-04-01' },
+  ])
+
+  assert.equal(stats[0].name, 'Ultragaz')
+  assert.equal(stats[0].averageDuration, 37)
+  assert.equal(stats[0].shortestDuration, 36)
+  assert.equal(stats[0].longestDuration, 38)
+  assert.equal(stats[0].cycles, 2)
+  assert.equal(stats[0].lastCycleEndedAt, '2026-06-01')
+  assert.equal(stats[1].name, 'Copagaz')
 })
