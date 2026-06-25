@@ -10,6 +10,7 @@ import {
   calculateConsumptionStats,
   calculateFinancialStats,
   calculateStats,
+  calculateTrendStats,
   createHistoryEntry,
   createManualFields,
   daysBetween,
@@ -488,7 +489,9 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
   const smartAlerts = useMemo(() => getSmartAlerts({
     stats,
     reserveAvailable: state.inventory?.reserveAvailable,
-  }), [state.inventory?.reserveAvailable, stats])
+    reminderEnabled: state.reminder?.enabled,
+    scheduledFor: state.reminder?.scheduledFor,
+  }), [state.inventory?.reserveAvailable, state.reminder?.enabled, state.reminder?.scheduledFor, stats])
 
   const pageTitle = PAGE_OPTIONS.find((page) => page.id === activePage)?.label || 'Início'
   const brandStats = useMemo(() => calculateBrandStats(state.history), [state.history])
@@ -501,6 +504,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
   const maxBrandAverage = Math.max(1, ...brandStats.map((brand) => brand.averageDuration))
   const consumptionStats = useMemo(() => calculateConsumptionStats(state.history), [state.history])
   const financialStats = useMemo(() => calculateFinancialStats(state.history), [state.history])
+  const trendStats = useMemo(() => calculateTrendStats(state.history), [state.history])
   const durationSeries = useMemo(() => state.history.slice(0, 6).reverse(), [state.history])
   const maxDuration = Math.max(1, ...durationSeries.map((cycle) => cycle.duration))
   const priceSeries = useMemo(() => state.history
@@ -814,6 +818,19 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
     }
   }
 
+  async function disableBuyReminder() {
+    try {
+      await cancelGasReminder()
+      setState((current) => ({
+        ...current,
+        reminder: { enabled: false, scheduledFor: '' },
+      }))
+      setNotificationStatus('Lembrete cancelado.')
+    } catch {
+      setNotificationStatus('Não foi possível cancelar o lembrete neste ambiente.')
+    }
+  }
+
   return (
     <main className={`app-shell user-shell ${currentTheme.id}`}>
       <section className="hero-card">
@@ -937,6 +954,25 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
 
       {activePage === 'alerts' && (
         <>
+      <section className="alert-summary-grid">
+        <article className={stats.buyInDays <= 7 ? 'low' : 'stable'}>
+          <span>Comprar</span>
+          <strong>{stats.recommendation}</strong>
+        </article>
+        <article className={stats.percent <= 10 ? 'critical' : 'stable'}>
+          <span>Estoque</span>
+          <strong>{stats.percent <= 10 ? 'Crítico' : state.inventory?.reserveAvailable ? 'Reserva ativa' : 'Monitorado'}</strong>
+        </article>
+        <article>
+          <span>Termina</span>
+          <strong>{formatDisplayDate(stats.expectedEnd)}</strong>
+        </article>
+        <article className={state.reminder?.enabled ? 'stable' : ''}>
+          <span>Lembrete</span>
+          <strong>{state.reminder?.enabled ? formatDisplayDate(state.reminder.scheduledFor) : 'Inativo'}</strong>
+        </article>
+      </section>
+
       <section className="smart-alert-list">
         {smartAlerts.map((alert) => (
           <article key={alert.title} className={`alert-card ${alert.tone}`}>
@@ -996,8 +1032,14 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
 
         <div className="reminder-actions">
           <button type="button" className="primary" onClick={scheduleBuyReminder}>
-            Ativar lembrete de compra
+            {state.reminder?.enabled ? 'Reagendar lembrete' : 'Ativar lembrete de compra'}
           </button>
+
+          {state.reminder?.enabled && (
+            <button type="button" className="ghost" onClick={disableBuyReminder}>
+              Cancelar lembrete
+            </button>
+          )}
 
           {(notificationStatus || state.reminder?.enabled) && (
             <span>
@@ -1173,6 +1215,32 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
 
       {activePage === 'stats' && (
         <>
+          <section className={`intelligence-card ${trendStats.consumptionTone}`}>
+            <div className="intelligence-header">
+              <div>
+                <span className="eyebrow">Inteligência estatística</span>
+                <h2>{trendStats.consumptionLabel}</h2>
+              </div>
+              <div className="intelligence-badge">
+                {trendStats.recentAverage ? `${trendStats.recentAverage} dias` : 'Sem amostra'}
+              </div>
+            </div>
+
+            <div className="trend-grid">
+              <article>
+                <span>Tendência de consumo</span>
+                <strong>{trendStats.consumptionMessage}</strong>
+              </article>
+              <article>
+                <span>Tendência de preço</span>
+                <strong>
+                  {trendStats.priceTrendLabel}
+                  {trendStats.priceDelta ? ` (${formatMoney(Math.abs(trendStats.priceDelta))})` : ''}
+                </strong>
+              </article>
+            </div>
+          </section>
+
           <section className="metrics-grid stats-grid">
             <article>
               <span>Média geral</span>

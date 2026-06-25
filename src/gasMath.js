@@ -316,30 +316,90 @@ export function calculateBrandStats(history = []) {
     .sort((a, b) => b.averageDuration - a.averageDuration)
 }
 
-export function getSmartAlerts({ stats, reserveAvailable = false }) {
-  const alerts = []
+export function calculateTrendStats(history = []) {
+  const recentCycles = history.slice(0, 3)
+  const previousCycles = history.slice(3, 6)
+  const recentAverage = averageDuration(recentCycles)
+  const previousAverage = averageDuration(previousCycles)
+  const paidValues = history
+    .map((entry) => Number(entry.paidValue))
+    .filter((value) => Number.isFinite(value) && value > 0)
+  const newestPrice = paidValues[0] || 0
+  const previousPrice = paidValues[1] || 0
+  const priceDelta = newestPrice && previousPrice ? newestPrice - previousPrice : 0
 
-  if (stats.percent <= 10) {
-    alerts.push({
-      tone: 'critical',
-      title: 'Estoque crítico',
-      message: reserveAvailable
-        ? 'Troque pelo botijão reserva e compre um novo para repor o estoque.'
-        : 'O gás está no limite. Compre ou troque o botijão hoje.',
-    })
-  } else if (stats.percent <= 25) {
-    alerts.push({
-      tone: 'low',
-      title: 'Comprar em breve',
-      message: `Recomendação atual: ${stats.recommendation.toLowerCase()}.`,
-    })
+  let consumptionTone = 'neutral'
+  let consumptionLabel = 'Aguardando dados'
+  let consumptionMessage = 'Registre pelo menos 6 ciclos para comparar a tendência recente com a anterior.'
+
+  if (recentAverage && previousAverage) {
+    const delta = recentAverage - previousAverage
+
+    if (delta <= -3) {
+      consumptionTone = 'warning'
+      consumptionLabel = 'Consumo acelerando'
+      consumptionMessage = `Os últimos ciclos duraram ${Math.abs(delta)} dias a menos que os ciclos anteriores.`
+    } else if (delta >= 3) {
+      consumptionTone = 'positive'
+      consumptionLabel = 'Rendimento melhorando'
+      consumptionMessage = `Os últimos ciclos duraram ${delta} dias a mais que os ciclos anteriores.`
+    } else {
+      consumptionTone = 'stable'
+      consumptionLabel = 'Consumo estável'
+      consumptionMessage = 'A média recente está próxima do padrão anterior.'
+    }
   }
 
-  alerts.push({
-    tone: 'neutral',
-    title: 'Previsão de término',
-    message: `Este botijão está previsto para acabar em ${formatDisplayDate(stats.expectedEnd)}.`,
-  })
+  return {
+    recentAverage,
+    previousAverage,
+    consumptionTone,
+    consumptionLabel,
+    consumptionMessage,
+    priceDelta,
+    priceTrendLabel: priceDelta > 0 ? 'Preço subiu' : priceDelta < 0 ? 'Preço caiu' : 'Preço estável',
+  }
+}
 
-  return alerts
+export function getSmartAlerts({
+  stats,
+  reserveAvailable = false,
+  reminderEnabled = false,
+  scheduledFor = '',
+}) {
+  const shouldBuySoon = stats.buyInDays <= 7 || stats.percent <= 25
+  const isCritical = stats.percent <= 10
+
+  return [
+    {
+      tone: isCritical ? 'critical' : shouldBuySoon ? 'low' : 'stable',
+      title: shouldBuySoon ? 'Comprar em breve' : 'Compra programada',
+      message: shouldBuySoon
+        ? `Recomendação atual: ${stats.recommendation.toLowerCase()}.`
+        : `Ainda há margem. ${stats.recommendation}.`,
+    },
+    {
+      tone: isCritical ? 'critical' : reserveAvailable ? 'stable' : 'neutral',
+      title: isCritical ? 'Estoque crítico' : 'Estoque monitorado',
+      message: isCritical
+        ? reserveAvailable
+          ? 'Troque pelo botijão reserva e compre um novo para repor o estoque.'
+          : 'O gás está no limite. Compre ou troque o botijão hoje.'
+        : reserveAvailable
+          ? 'Há um botijão reserva disponível para emergência.'
+          : 'Sem reserva cadastrada. Vale manter um segundo botijão quando possível.',
+    },
+    {
+      tone: 'neutral',
+      title: 'Previsão de término',
+      message: `Este botijão está previsto para acabar em ${formatDisplayDate(stats.expectedEnd)}.`,
+    },
+    {
+      tone: reminderEnabled ? 'stable' : 'neutral',
+      title: 'Notificação local',
+      message: reminderEnabled
+        ? `Lembrete ativo para ${formatDisplayDate(scheduledFor)}.`
+        : 'Ative um lembrete local para receber o aviso de compra no celular.',
+    },
+  ]
 }

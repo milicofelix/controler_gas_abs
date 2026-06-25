@@ -5,9 +5,11 @@ import {
   averageDuration,
   calculateBrandStats,
   calculateStats,
+  calculateTrendStats,
   daysBetween,
   detectConsumptionPattern,
   getAlert,
+  getSmartAlerts,
 } from './gasMath.js'
 
 test('calcula dias entre datas sem contar o dia de instalacao', () => {
@@ -68,4 +70,44 @@ test('calcula ranking de duracao por marca', () => {
   assert.equal(stats[0].cycles, 2)
   assert.equal(stats[0].lastCycleEndedAt, '2026-06-01')
   assert.equal(stats[1].name, 'Copagaz')
+})
+
+test('detecta tendencia de consumo acelerando', () => {
+  const trend = calculateTrendStats([
+    { duration: 30, paidValue: '120' },
+    { duration: 31, paidValue: '118' },
+    { duration: 30, paidValue: '117' },
+    { duration: 36, paidValue: '116' },
+    { duration: 35, paidValue: '115' },
+    { duration: 36, paidValue: '114' },
+  ])
+
+  assert.equal(trend.consumptionTone, 'warning')
+  assert.equal(trend.consumptionLabel, 'Consumo acelerando')
+  assert.equal(trend.priceTrendLabel, 'Preço subiu')
+})
+
+test('monta alertas inteligentes com compra, estoque, previsao e notificacao', () => {
+  const stats = calculateStats({
+    startedAt: '2026-06-01',
+    today: '2026-07-01',
+    projectedCycleDays: 35,
+  })
+
+  const alerts = getSmartAlerts({
+    stats,
+    reserveAvailable: true,
+    reminderEnabled: true,
+    scheduledFor: '2026-07-03',
+  })
+
+  assert.deepEqual(alerts.map((alert) => alert.title), [
+    'Comprar em breve',
+    'Estoque monitorado',
+    'Previsão de término',
+    'Notificação local',
+  ])
+  assert.equal(alerts[0].tone, 'low')
+  assert.equal(alerts[1].tone, 'stable')
+  assert.equal(alerts[3].tone, 'stable')
 })
