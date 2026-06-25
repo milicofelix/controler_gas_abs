@@ -1,0 +1,222 @@
+{
+  "app": "Controle Gás",
+  "version": 2,
+  "exportedAt": "2026-06-16T12:00:00.000Z",
+  "user": {
+    "name": "Adriano",
+    "homeName": "Casa Adriano",
+    "email": "casa@gas.local",
+    "theme": "realistic",
+    "residenceProfile": {
+      "city": "São Paulo",
+      "state": "SP",
+      "avatar": "",
+      "updatedAt": "2026-06-16"
+    }
+  },
+  "data": {
+    "startedAt": "2026-06-08",
+    "cycleDays": 35,
+    "history": [
+      {
+        "id": "2026-06-08-2026-05-03-36-demo",
+        "installedAt": "2026-05-03",
+        "endedAt": "2026-06-08",
+        "duration": 36,
+        "paidValue": "122.00",
+        "notes": "Ciclo estável, uso normal da cozinha.",
+        "brandId": "ultragaz",
+        "brandName": "Ultragaz",
+        "brandLogo": ""
+      },
+      {
+        "id": "2026-05-03-2026-03-30-34-demo",
+        "installedAt": "2026-03-30",
+        "endedAt": "2026-05-03",
+        "duration": 34,
+        "paidValue": "119.00",
+        "notes": "Mais uso no fim de semana.",
+        "brandId": "copagaz",
+        "brandName": "Copagaz",
+        "brandLogo": ""
+      },
+      {
+        "id": "2026-03-30-2026-02-21-37-demo",
+        "installedAt": "2026-02-21",
+        "endedAt": "2026-03-30",
+        "duration": 37,
+        "paidValue": "121.00",
+        "notes": "Boa duração.",
+        "brandId": "ultragaz",
+        "brandName": "Ultragaz",
+        "brandLogo": ""
+      },
+      {
+        "id": "2026-02-21-2026-01-18-34-demo",
+        "installedAt": "2026-01-18",
+        "endedAt": "2026-02-21",
+        "duration": 34,
+        "paidValue": "116.00",
+        "notes": "Ciclo dentro da média.",
+        "brandId": "liquigas",
+        "brandName": "Liquigás",
+        "brandLogo": ""
+      },
+      {
+        "id": "2026-01-18-2025-12-12-37-demo",
+        "installedAt": "2025-12-12",
+        "endedAt": "2026-01-18",
+        "duration": 37,
+        "paidValue": "118.00",
+        "notes": "Período de férias com uso moderado.",
+        "brandId": "supergasbras",
+        "brandName": "Supergasbras",
+        "brandLogo": ""
+      },
+      {
+        "id": "2025-12-12-2025-11-08-34-demo",
+        "installedAt": "2025-11-08",
+        "endedAt": "2025-12-12",
+        "duration": 34,
+        "paidValue": "115.00",
+        "notes": "Uso normal.",
+        "brandId": "ultragaz",
+        "brandName": "Ultragaz",
+        "brandLogo": ""
+      },
+      {
+        "id": "2025-11-08-2025-10-04-35-demo",
+        "installedAt": "2025-10-04",
+        "endedAt": "2025-11-08",
+        "duration": 35,
+        "paidValue": "112.00",
+        "notes": "Exatamente na média esperada.",
+        "brandId": "copagaz",
+        "brandName": "Copagaz",
+        "brandLogo": ""
+      },
+      {
+        "id": "2025-10-04-2025-08-28-37-demo",
+        "installedAt": "2025-08-28",
+        "endedAt": "2025-10-04",
+        "duration": 37,
+        "paidValue": "110.00",
+        "notes": "Boa duração.",
+        "brandId": "nacional-gas",
+        "brandName": "Nacional Gás",
+        "brandLogo": ""
+      },
+      {
+        "id": "2025-08-28-2025-07-24-35-demo",
+        "installedAt": "2025-07-24",
+        "endedAt": "2025-08-28",
+        "duration": 35,
+        "paidValue": "108.00",
+        "notes": "Ciclo regular.",
+        "brandId": "ultragaz",
+        "brandName": "Ultragaz",
+        "brandLogo": ""
+      },
+      {
+        "id": "2025-07-24-2025-06-18-36-demo",
+        "installedAt": "2025-06-18",
+        "endedAt": "2025-07-24",
+        "duration": 36,
+        "paidValue": "106.00",
+        "notes": "Uso normal no inverno.",
+        "brandId": "consigaz",
+        "brandName": "Consigaz",
+        "brandLogo": ""
+      },
+      {
+        "id": "2025-06-18-2025-05-14-35-demo",
+        "installedAt": "2025-05-14",
+        "endedAt": "2025-06-18",
+        "duration": 35,
+        "paidValue": "104.00",
+        "notes": "Sem variação relevante.",
+        "brandId": "liquigas",
+        "brandName": "Liquigás",
+        "brandLogo": ""
+      },
+      {
+        "id": "2025-05-14-2025-04-10-34-demo",
+        "installedAt": "2025-04-10",
+        "endedAt": "2025-05-14",
+        "duration": 34,
+        "paidValue": "102.00",
+        "notes": "Um pouco abaixo da média.",
+        "brandId": "copagaz",
+        "brandName": "Copagaz",
+        "brandLogo": ""
+      },
+      {
+        "id": "2025-04-10-2025-03-04-37-demo",
+        "installedAt": "2025-03-04",
+        "endedAt": "2025-04-10",
+        "duration": 37,
+        "paidValue": "101.00",
+        "notes": "Boa duração no ciclo.",
+        "brandId": "ultragaz",
+        "brandName": "Ultragaz",
+        "brandLogo": ""
+      },
+      {
+        "id": "2025-03-04-2025-01-29-34-demo",
+        "installedAt": "2025-01-29",
+        "endedAt": "2025-03-04",
+        "duration": 34,
+        "paidValue": "99.00",
+        "notes": "Uso um pouco maior no verão.",
+        "brandId": "supergasbras",
+        "brandName": "Supergasbras",
+        "brandLogo": ""
+      },
+      {
+        "id": "2025-01-29-2025-01-01-28-demo",
+        "installedAt": "2025-01-01",
+        "endedAt": "2025-01-29",
+        "duration": 28,
+        "paidValue": "98.00",
+        "notes": "Ciclo mais curto por festas e visitas.",
+        "brandId": "consigaz",
+        "brandName": "Consigaz",
+        "brandLogo": ""
+      }
+    ],
+    "manual": {
+      "installedAt": "2026-06-08",
+      "endedAt": "2026-06-16",
+      "paidValue": "124.00",
+      "notes": "Botijão atual em uso."
+    },
+    "lastFinishedCycle": {
+      "id": "2026-06-08-2026-05-03-36-demo",
+      "installedAt": "2026-05-03",
+      "endedAt": "2026-06-08",
+      "duration": 36,
+      "paidValue": "122.00",
+      "notes": "Ciclo estável, uso normal da cozinha.",
+      "brandId": "ultragaz",
+      "brandName": "Ultragaz",
+      "brandLogo": ""
+    },
+    "reminder": {
+      "enabled": false,
+      "scheduledFor": ""
+    },
+    "currentBrand": {
+      "id": "ultragaz",
+      "name": "Ultragaz",
+      "logo": ""
+    },
+    "inventory": {
+      "reserveAvailable": true,
+      "reserveBrand": {
+        "id": "copagaz",
+        "name": "Copagaz",
+        "logo": ""
+      }
+    }
+  }
+}
