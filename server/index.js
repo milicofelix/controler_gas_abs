@@ -46,6 +46,17 @@ app.use((request, response, next) => {
 
 app.use(express.json({ limit: '8mb' }))
 
+app.use('/api', (request, response, next) => {
+  const startedAt = Date.now()
+
+  response.on('finish', () => {
+    const elapsedMs = Date.now() - startedAt
+    console.log(`[api] ${request.method} ${request.originalUrl} ${response.statusCode} ${elapsedMs}ms`)
+  })
+
+  next()
+})
+
 async function getStoredUsers() {
   const [rows] = await pool.query('SELECT payload FROM gas_users ORDER BY created_at ASC')
   return normalizeAuthUsers(rows.map((row) => row.payload))
@@ -110,8 +121,11 @@ app.get('/api/users', async (_request, response) => {
   try {
     await ensureSchema()
     await seedUsersIfNeeded()
-    response.json({ users: await getStoredUsers() })
+    const users = await getStoredUsers()
+    console.log(`[api] carregou ${users.length} usuarios`)
+    response.json({ users })
   } catch (error) {
+    console.error('[api] erro ao carregar usuarios:', error.message)
     response.status(500).json({ message: 'Não foi possível carregar os usuários.', detail: error.message })
   }
 })
@@ -125,8 +139,10 @@ app.put('/api/users', async (request, response) => {
 
     await ensureSchema()
     const users = await saveUsers(request.body.users)
+    console.log(`[api] salvou ${users.length} usuarios`)
     response.json({ users })
   } catch (error) {
+    console.error('[api] erro ao salvar usuarios:', error.message)
     response.status(500).json({ message: 'Não foi possível salvar os usuários.', detail: error.message })
   }
 })
