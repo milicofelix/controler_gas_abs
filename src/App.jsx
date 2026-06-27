@@ -68,6 +68,16 @@ const STATUS_STEPS = [
   { label: 'Crítico', tone: 'critical' },
 ]
 
+function AppLogo({ className = '' }) {
+  return (
+    <img
+      className={`app-logo ${className}`}
+      src="/logo-controle-gas-abs.png"
+      alt="Controle de Gás ABS"
+    />
+  )
+}
+
 async function cancelGasReminder() {
   try {
     await LocalNotifications.cancel({
@@ -198,7 +208,7 @@ function CylinderGauge({ percent, tone }) {
   )
 }
 
-function LoginScreen({ users, onLogin, onCreateUser, storageStatus }) {
+function LoginScreen({ users, onLogin, onCreateUser }) {
   const [mode, setMode] = useState('login')
   const [form, setForm] = useState({
     name: '',
@@ -248,21 +258,61 @@ function LoginScreen({ users, onLogin, onCreateUser, storageStatus }) {
     setMode('login')
   }
 
+  function fillAccess(email, password) {
+    setMode('login')
+    setMessage('')
+    setForm((current) => ({
+      ...current,
+      email,
+      password,
+    }))
+  }
+
   return (
     <main className="app-shell auth-shell">
       <section className="hero-card auth-hero">
         <div className="hero-copy">
-          <div className="brand-row">
-            <span className="brand-mark" aria-hidden="true">P13</span>
-            <span className="eyebrow">Controle Gás</span>
+          <AppLogo className="auth-logo" />
+          <div className="auth-benefits">
+            <article>
+              <span aria-hidden="true">✓</span>
+              <div>
+                <strong>Mais segurança</strong>
+                <p>Monitore seus botijões e evite riscos com alertas inteligentes.</p>
+              </div>
+            </article>
+            <article>
+              <span aria-hidden="true">▥</span>
+              <div>
+                <strong>Mais controle</strong>
+                <p>Acompanhe histórico, consumo, marcas e estoque em um só lugar.</p>
+              </div>
+            </article>
+            <article>
+              <span aria-hidden="true">$</span>
+              <div>
+                <strong>Mais economia</strong>
+                <p>Veja custos, médias e tendências para comprar melhor.</p>
+              </div>
+            </article>
           </div>
-          <h1>{mode === 'login' ? 'Entrar' : 'Nova casa'}</h1>
-          <p>Agora cada usuário acompanha o consumo da própria casa. O super admin acessa um painel geral.</p>
-          <span className="sync-status">{storageStatus}</span>
         </div>
       </section>
 
       <section className="form-card auth-card">
+        <div className="secure-badge">
+          <span aria-hidden="true">✓</span>
+          <div>
+            <strong>Acesso seguro</strong>
+            <small>Dados sincronizados no seu banco</small>
+          </div>
+        </div>
+
+        <div className="auth-title">
+          <h1>{mode === 'login' ? 'Bem-vindo de volta!' : 'Cadastre sua casa'}</h1>
+          <p>{mode === 'login' ? 'Faça login para acessar sua conta.' : 'Crie o acesso para acompanhar seu botijão.'}</p>
+        </div>
+
         <div className="auth-tabs" role="tablist" aria-label="Acesso">
           <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => setMode('login')}>Login</button>
           <button type="button" className={mode === 'register' ? 'active' : ''} onClick={() => setMode('register')}>Criar usuário</button>
@@ -285,32 +335,38 @@ function LoginScreen({ users, onLogin, onCreateUser, storageStatus }) {
 
           <label>
             E-mail
-            <input type="email" value={form.email} onChange={(event) => update('email', event.target.value)} />
+            <input type="email" value={form.email} onChange={(event) => update('email', event.target.value)} placeholder="voce@email.com" />
           </label>
 
           <label>
             Senha
-            <input type="password" value={form.password} onChange={(event) => update('password', event.target.value)} />
+            <input type="password" value={form.password} onChange={(event) => update('password', event.target.value)} placeholder="Sua senha" />
           </label>
 
           <button type="submit" className="primary">
-            {mode === 'login' ? 'Acessar' : 'Criar usuário'}
+            {mode === 'login' ? 'Entrar' : 'Criar usuário'}
           </button>
         </form>
 
         {message && <div className="settings-status" role="status">{message}</div>}
 
         <div className="demo-access">
-          <span className="eyebrow">Acessos locais para teste</span>
-          <p><strong>Usuário:</strong> {DEMO_USER_EMAIL} / {DEMO_USER_PASSWORD}</p>
-          <p><strong>Super admin:</strong> {SUPER_ADMIN_EMAIL} / {SUPER_ADMIN_PASSWORD}</p>
+          <span className="eyebrow">Ou acesse como</span>
+          <div className="demo-access-actions">
+            <button type="button" className="ghost" onClick={() => fillAccess(DEMO_USER_EMAIL, DEMO_USER_PASSWORD)}>
+              Usuário de teste
+            </button>
+            <button type="button" className="ghost" onClick={() => fillAccess(SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD)}>
+              Super admin
+            </button>
+          </div>
         </div>
       </section>
     </main>
   )
 }
 
-function AdminDashboard({ users, onLogout, storageStatus }) {
+function AdminDashboard({ users, onLogout }) {
   const today = formatDateInput(new Date())
   const userRows = users
     .filter((user) => user.role !== 'admin')
@@ -335,12 +391,11 @@ function AdminDashboard({ users, onLogout, storageStatus }) {
       <section className="hero-card">
         <div className="hero-copy">
           <div className="brand-row">
-            <span className="brand-mark" aria-hidden="true">ADM</span>
+            <AppLogo className="header-logo" />
             <span className="eyebrow">Super admin</span>
           </div>
           <h1>Dashboard geral</h1>
           <p>Visão consolidada dos consumos registrados em cada casa.</p>
-          <span className="sync-status">{storageStatus}</span>
         </div>
         <button type="button" className="logout-button" onClick={onLogout}>Encerrar sessão</button>
       </section>
@@ -461,7 +516,7 @@ function AdminDashboard({ users, onLogout, storageStatus }) {
   )
 }
 
-function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout, storageStatus }) {
+function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout }) {
   const [activePage, setActivePage] = useState('home')
   const [state, setState] = useState(() => normalizeGasState(currentUser.state))
   const [notificationStatus, setNotificationStatus] = useState('')
@@ -872,7 +927,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
       <section className="hero-card">
         <div className="hero-copy">
           <div className="brand-row">
-            <span className="brand-mark" aria-hidden="true">P13</span>
+            <AppLogo className="header-logo" />
             <span className="eyebrow">{currentUser.homeName}</span>
           </div>
           <h1>Meu Gás</h1>
@@ -881,7 +936,6 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
               ? `Previsão inteligente baseada na média móvel dos últimos ${intelligence.sampleSize} ciclos.`
               : `Estimativa inicial baseada em ${DEFAULT_CYCLE_DAYS} dias de consumo.`}
           </p>
-          <span className="sync-status">{storageStatus}</span>
         </div>
 
         <div className="hero-actions">
@@ -972,7 +1026,6 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
             <h2>{currentBrand.name}</h2>
             <p>
               Compra: {formatDisplayDate(state.startedAt)}
-              {currentBrand.logo && <small>Logo personalizado ativo</small>}
             </p>
           </div>
           <BrandLogo brand={currentBrand} />
@@ -1591,7 +1644,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
 function App() {
   const [users, setUsers] = useState(loadUsers)
   const [session, setSession] = useState(loadSession)
-  const [storageStatus, setStorageStatus] = useState('Sincronizando com MySQL...')
+  const [, setStorageStatus] = useState('Sincronizando com MySQL...')
   const [remoteReady, setRemoteReady] = useState(false)
   const saveTimerRef = useRef(null)
 
@@ -1724,11 +1777,11 @@ function App() {
   }, [])
 
   if (!currentUser) {
-    return <LoginScreen users={users} onLogin={login} onCreateUser={createNewUser} storageStatus={storageStatus} />
+    return <LoginScreen users={users} onLogin={login} onCreateUser={createNewUser} />
   }
 
   if (currentUser.role === 'admin') {
-    return <AdminDashboard users={users} onLogout={logout} storageStatus={storageStatus} />
+    return <AdminDashboard users={users} onLogout={logout} />
   }
 
   return (
@@ -1739,7 +1792,6 @@ function App() {
       onUpdateUserProfile={updateUserProfile}
       onUpdateUserTheme={updateUserTheme}
       onLogout={logout}
-      storageStatus={storageStatus}
     />
   )
 }
