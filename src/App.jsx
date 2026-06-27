@@ -57,7 +57,7 @@ const PAGE_OPTIONS = [
   { id: 'home', label: 'Início', icon: '⌂' },
   { id: 'history', label: 'Histórico', icon: '↺' },
   { id: 'stats', label: 'Análises', icon: '▥' },
-  { id: 'alerts', label: 'Alertas', icon: '♧' },
+  { id: 'alerts', label: 'Alertas', icon: '!' },
   { id: 'profile', label: 'Perfil', icon: '♙' },
 ]
 
@@ -342,7 +342,7 @@ function AdminDashboard({ users, onLogout, storageStatus }) {
           <p>Visão consolidada dos consumos registrados em cada casa.</p>
           <span className="sync-status">{storageStatus}</span>
         </div>
-        <button type="button" className="logout-button" onClick={onLogout}>Sair</button>
+        <button type="button" className="logout-button" onClick={onLogout}>Encerrar sessão</button>
       </section>
 
       <section className="admin-metrics">
@@ -669,6 +669,38 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
     }))
   }
 
+  function useReserveCylinder() {
+    const reserveBrand = state.inventory?.reserveBrand
+      ? normalizeBrand(state.inventory.reserveBrand)
+      : currentBrand
+    const duration = Math.max(1, daysBetween(state.startedAt, today))
+    const lastFinishedCycle = createHistoryEntry({
+      installedAt: state.startedAt,
+      endedAt: today,
+      duration,
+      paidValue: state.manual?.paidValue || '',
+      notes: state.manual?.notes || 'Troca pelo botijão reserva.',
+      brand: currentBrand,
+    })
+    const nextHistory = [lastFinishedCycle, ...state.history].slice(0, 8)
+
+    setState((current) => ({
+      ...current,
+      startedAt: today,
+      history: nextHistory,
+      lastFinishedCycle,
+      manual: createManualFields({ startedAt: today, endedAt: today }),
+      currentBrand: reserveBrand,
+      inventory: {
+        reserveAvailable: false,
+        reserveBrand: null,
+      },
+      reminder: { enabled: false, scheduledFor: '' },
+    }))
+
+    void cancelGasReminder()
+  }
+
   function updateManualField(field, value) {
     setState((current) => ({
       ...current,
@@ -854,7 +886,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
 
         <div className="hero-actions">
           <div className={`status-pill ${stats.status.tone}`}>{stats.status.label}</div>
-          <button type="button" className="logout-button" onClick={onLogout}>Sair</button>
+          <button type="button" className="logout-button" onClick={onLogout}>Encerrar sessão</button>
         </div>
       </section>
 
@@ -946,11 +978,25 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
           <BrandLogo brand={currentBrand} />
         </article>
 
-        <article className="stock-card">
+        <article className={`stock-card reserve-card ${state.inventory?.reserveAvailable ? 'available' : ''}`}>
           <div>
             <span className="eyebrow">Reserva</span>
             <h2>{state.inventory?.reserveAvailable ? 'Disponível' : 'Sem reserva'}</h2>
-            <p>{state.inventory?.reserveAvailable ? 'Pronto para troca.' : 'Cadastre se tiver dois botijões.'}</p>
+            <p>
+              {state.inventory?.reserveAvailable
+                ? `Pronto para troca${state.inventory.reserveBrand?.name ? ` • ${state.inventory.reserveBrand.name}` : ''}.`
+                : 'Cadastre se tiver dois botijões.'}
+            </p>
+          </div>
+          <div className="reserve-actions">
+            {state.inventory?.reserveAvailable && (
+              <button type="button" className="ghost compact-button" onClick={useReserveCylinder}>
+                Usar reserva
+              </button>
+            )}
+            <button type="button" className="primary compact-button" onClick={toggleReserveAvailability}>
+              {state.inventory?.reserveAvailable ? 'Remover' : 'Cadastrar'}
+            </button>
           </div>
         </article>
       </section>
@@ -1007,8 +1053,8 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
             <h2>Troque pelo reserva</h2>
             <p>Depois da troca, compre um novo botijão para voltar a ter estoque de segurança.</p>
           </div>
-          <button type="button" className="primary" onClick={toggleReserveAvailability}>
-            Usei o reserva
+          <button type="button" className="primary" onClick={useReserveCylinder}>
+            Trocar pelo reserva
           </button>
         </section>
       )}
