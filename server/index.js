@@ -12,7 +12,7 @@ import {
 } from './db.js'
 
 const app = express()
-const port = Number(process.env.API_PORT || 3001)
+const port = Number(process.env.PORT || process.env.API_PORT || 3001)
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const distPath = path.resolve(dirname, '..', 'dist')
 const allowedOrigins = new Set([
