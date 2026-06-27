@@ -16,6 +16,8 @@ export const SUPER_ADMIN_PASSWORD = 'admin123'
 export const DEMO_USER_EMAIL = 'casa@gas.local'
 export const DEMO_USER_PASSWORD = 'casa123'
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || ''
+
 export function createDefaultGasState(today = formatDateInput(new Date())) {
   return {
     startedAt: today,
@@ -77,7 +79,7 @@ function migrateLegacyState(today) {
   return createDefaultGasState(today)
 }
 
-function createSeedUsers(today) {
+export function createSeedUsers(today) {
   return [
     {
       id: 'super-admin',
@@ -110,26 +112,30 @@ function createSeedUsers(today) {
   ]
 }
 
+export function normalizeUsers(users, today = formatDateInput(new Date())) {
+  return users.map((user) => ({
+    id: user.id,
+    name: user.name || user.email,
+    homeName: user.homeName || user.name || user.email,
+    email: String(user.email || '').toLowerCase(),
+    password: user.password || '',
+    role: user.role === 'admin' ? 'admin' : 'user',
+    state: user.role === 'admin' ? null : normalizeGasState(user.state, today),
+    theme: user.theme || 'blue-modern',
+    residenceProfile: user.role === 'admin'
+      ? null
+      : normalizeResidenceProfile(user, today),
+    createdAt: user.createdAt || today,
+  })).filter((user) => user.id && user.email)
+}
+
 export function loadUsers() {
   const today = formatDateInput(new Date())
 
   try {
     const stored = JSON.parse(localStorage.getItem(AUTH_USERS_KEY))
     if (Array.isArray(stored) && stored.length > 0) {
-      return stored.map((user) => ({
-        id: user.id,
-        name: user.name || user.email,
-        homeName: user.homeName || user.name || user.email,
-        email: String(user.email || '').toLowerCase(),
-        password: user.password || '',
-        role: user.role === 'admin' ? 'admin' : 'user',
-        state: user.role === 'admin' ? null : normalizeGasState(user.state, today),
-        theme: user.theme || 'blue-modern',
-        residenceProfile: user.role === 'admin'
-          ? null
-          : normalizeResidenceProfile(user, today),
-        createdAt: user.createdAt || today,
-      })).filter((user) => user.id && user.email)
+      return normalizeUsers(stored, today)
     }
   } catch {
     // Recria base local caso esteja corrompida.
@@ -142,6 +148,40 @@ export function loadUsers() {
 
 export function saveUsers(users) {
   localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users))
+}
+
+export async function loadRemoteUsers() {
+  const response = await fetch(`${API_BASE_URL}/api/users`)
+
+  if (!response.ok) {
+    throw new Error('remote-users-unavailable')
+  }
+
+  const payload = await response.json()
+  const users = normalizeUsers(payload.users || [])
+  saveUsers(users)
+  return users
+}
+
+export async function saveRemoteUsers(users) {
+  const normalizedUsers = normalizeUsers(users)
+
+  saveUsers(normalizedUsers)
+
+  const response = await fetch(`${API_BASE_URL}/api/users`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ users: normalizedUsers }),
+  })
+
+  if (!response.ok) {
+    throw new Error('remote-users-save-failed')
+  }
+
+  const payload = await response.json()
+  const savedUsers = normalizeUsers(payload.users || normalizedUsers)
+  saveUsers(savedUsers)
+  return savedUsers
 }
 
 export function loadSession() {

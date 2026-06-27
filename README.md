@@ -1,6 +1,6 @@
 # Controle Gas
 
-Aplicativo React/Vite para acompanhar o consumo de um botijao P13, com historico local e previsao inteligente baseada nos ultimos ciclos.
+Aplicativo React/Vite para acompanhar o consumo de um botijao P13, com API Node/Express e persistencia em MySQL.
 
 ## Rodar no navegador
 
@@ -19,6 +19,61 @@ http://localhost:8090
 ```bash
 docker compose run --rm gas_app npm run build
 docker compose run --rm gas_app npm run lint
+docker compose run --rm gas_app npm test
+```
+
+## Banco de dados
+
+Em desenvolvimento com Docker, a API usa as variaveis configuradas no `docker-compose.yml`:
+
+```text
+DB_CONNECTION=mysql
+DB_HOST=infra-mysql-1
+DB_PORT=3306
+DB_DATABASE=controlegasabs
+DB_USERNAME=admin
+DB_PASSWORD=admin
+```
+
+A API cria automaticamente a tabela `gas_users` quando sobe.
+
+## Producao sem Docker
+
+Crie um arquivo `.env` no servidor a partir de `.env.production.example`:
+
+```text
+API_PORT=3001
+DB_CONNECTION=mysql
+DB_HOST=localhost
+DB_PORT=3306
+DB_DATABASE=rico4167_controlegasabs
+DB_USERNAME=rico4167_controlegasabs
+DB_PASSWORD=troque-pela-senha-real
+VITE_API_URL=
+CLIENT_ORIGIN=
+```
+
+Instale, gere o build e inicie:
+
+```bash
+npm install
+npm run build
+npm start
+```
+
+Com `VITE_API_URL` vazio, o mesmo servidor Node entrega o frontend de `dist/` e a API em `/api`.
+
+Se o frontend ficar em outro dominio ou o app mobile chamar a API publica, defina antes do build:
+
+```text
+VITE_API_URL=https://seudominio.com
+CLIENT_ORIGIN=https://seudominio.com
+```
+
+Para Capacitor/mobile, rode o build com `VITE_API_URL` apontando para a URL publica da API antes de sincronizar:
+
+```bash
+npm run cap:android
 ```
 
 ## Mobile hibrido
@@ -59,25 +114,27 @@ npm run cap:open:ios
 
 Android precisa de Android Studio/Android SDK. iOS precisa de macOS com Xcode.
 
-## Dados locais
+## Dados e sessao
 
-Hoje os dados ficam no `localStorage`, na chave:
+Os dados principais ficam no MySQL, via API Node. O navegador ainda guarda sessao e uma copia local de emergencia nas chaves:
 
 ```text
-gas-control-state-v1
+gas-control-users-v1
+gas-control-session-v1
 ```
 
-Para limpar tudo no navegador:
+Para limpar a sessao/copia local do navegador sem apagar o banco:
 
 ```js
-localStorage.removeItem('gas-control-state-v1')
+localStorage.removeItem('gas-control-users-v1')
+localStorage.removeItem('gas-control-session-v1')
 location.reload()
 ```
 
 
-## Login e usuarios locais
+## Login e usuarios
 
-Esta fase adiciona uma camada de login local usando `localStorage`. Nao e autenticacao segura para producao; e uma simulacao funcional para validar o fluxo mobile antes de criar backend/API.
+A API semeia os acessos iniciais quando o banco esta vazio:
 
 Acessos iniciais:
 
@@ -94,11 +151,3 @@ gas-control-session-v1
 ```
 
 O usuario comum ve somente o acompanhamento da propria casa. O super admin acessa o dashboard geral com nivel estimado, status, previsao, media e historico consolidado de todas as casas cadastradas.
-
-Para zerar tambem usuarios e sessao:
-
-```js
-localStorage.removeItem('gas-control-users-v1')
-localStorage.removeItem('gas-control-session-v1')
-location.reload()
-```

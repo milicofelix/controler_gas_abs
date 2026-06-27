@@ -4,7 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "node server/index.js",
+    "dev:web": "vite --host 0.0.0.0",
+    "start": "node server/index.js",
     "build": "vite build",
     "lint": "eslint .",
     "test": "node --test src/gasMath.test.js",
@@ -21,6 +24,9 @@
     "@capacitor/core": "^8.4.0",
     "@capacitor/ios": "^8.4.0",
     "@capacitor/local-notifications": "^8.2.0",
+    "concurrently": "^10.0.3",
+    "express": "^5.2.1",
+    "mysql2": "^3.22.5",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },

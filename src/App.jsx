@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import {
   DEFAULT_CYCLE_DAYS,
@@ -32,9 +32,11 @@ import {
   createDefaultGasState,
   createUser,
   loadSession,
+  loadRemoteUsers,
   loadUsers,
   normalizeGasState,
   saveSession,
+  saveRemoteUsers,
   saveUsers,
 } from './authStorage'
 import './App.css'
@@ -196,7 +198,7 @@ function CylinderGauge({ percent, tone }) {
   )
 }
 
-function LoginScreen({ users, onLogin, onCreateUser }) {
+function LoginScreen({ users, onLogin, onCreateUser, storageStatus }) {
   const [mode, setMode] = useState('login')
   const [form, setForm] = useState({
     name: '',
@@ -256,6 +258,7 @@ function LoginScreen({ users, onLogin, onCreateUser }) {
           </div>
           <h1>{mode === 'login' ? 'Entrar' : 'Nova casa'}</h1>
           <p>Agora cada usuário acompanha o consumo da própria casa. O super admin acessa um painel geral.</p>
+          <span className="sync-status">{storageStatus}</span>
         </div>
       </section>
 
@@ -307,7 +310,7 @@ function LoginScreen({ users, onLogin, onCreateUser }) {
   )
 }
 
-function AdminDashboard({ users, onLogout }) {
+function AdminDashboard({ users, onLogout, storageStatus }) {
   const today = formatDateInput(new Date())
   const userRows = users
     .filter((user) => user.role !== 'admin')
@@ -337,6 +340,7 @@ function AdminDashboard({ users, onLogout }) {
           </div>
           <h1>Dashboard geral</h1>
           <p>Visão consolidada dos consumos registrados em cada casa.</p>
+          <span className="sync-status">{storageStatus}</span>
         </div>
         <button type="button" className="logout-button" onClick={onLogout}>Sair</button>
       </section>
@@ -457,7 +461,7 @@ function AdminDashboard({ users, onLogout }) {
   )
 }
 
-function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout }) {
+function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout, storageStatus }) {
   const [activePage, setActivePage] = useState('home')
   const [state, setState] = useState(() => normalizeGasState(currentUser.state))
   const [notificationStatus, setNotificationStatus] = useState('')
@@ -845,6 +849,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
               ? `Previsão inteligente baseada na média móvel dos últimos ${intelligence.sampleSize} ciclos.`
               : `Estimativa inicial baseada em ${DEFAULT_CYCLE_DAYS} dias de consumo.`}
           </p>
+          <span className="sync-status">{storageStatus}</span>
         </div>
 
         <div className="hero-actions">
@@ -1540,6 +1545,9 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
 function App() {
   const [users, setUsers] = useState(loadUsers)
   const [session, setSession] = useState(loadSession)
+  const [storageStatus, setStorageStatus] = useState('Sincronizando com MySQL...')
+  const [remoteReady, setRemoteReady] = useState(false)
+  const saveTimerRef = useRef(null)
 
   const currentUser = useMemo(
     () => users.find((user) => user.id === session?.userId) || null,
@@ -1547,8 +1555,48 @@ function App() {
   )
 
   useEffect(() => {
+    let isActive = true
+
+    loadRemoteUsers()
+      .then((remoteUsers) => {
+        if (!isActive) return
+        setUsers(remoteUsers)
+        setStorageStatus('Dados sincronizados com MySQL.')
+      })
+      .catch(() => {
+        if (!isActive) return
+        setStorageStatus('MySQL indisponível. Usando cópia local neste dispositivo.')
+      })
+      .finally(() => {
+        if (isActive) setRemoteReady(true)
+      })
+
+    return () => {
+      isActive = false
+    }
+  }, [])
+
+  useEffect(() => {
     saveUsers(users)
-  }, [users])
+
+    if (!remoteReady) return undefined
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current)
+    }
+
+    saveTimerRef.current = setTimeout(() => {
+      saveRemoteUsers(users)
+        .then(() => setStorageStatus('Dados sincronizados com MySQL.'))
+        .catch(() => setStorageStatus('MySQL indisponível. Alterações salvas localmente.'))
+    }, 500)
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current)
+      }
+    }
+  }, [remoteReady, users])
 
   useEffect(() => {
     const theme = currentUser?.theme || 'blue-modern'
@@ -1630,11 +1678,11 @@ function App() {
   }, [])
 
   if (!currentUser) {
-    return <LoginScreen users={users} onLogin={login} onCreateUser={createNewUser} />
+    return <LoginScreen users={users} onLogin={login} onCreateUser={createNewUser} storageStatus={storageStatus} />
   }
 
   if (currentUser.role === 'admin') {
-    return <AdminDashboard users={users} onLogout={logout} />
+    return <AdminDashboard users={users} onLogout={logout} storageStatus={storageStatus} />
   }
 
   return (
@@ -1645,6 +1693,7 @@ function App() {
       onUpdateUserProfile={updateUserProfile}
       onUpdateUserTheme={updateUserTheme}
       onLogout={logout}
+      storageStatus={storageStatus}
     />
   )
 }
