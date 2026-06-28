@@ -56,6 +56,7 @@ function getThemeOption(themeId) {
 const PAGE_OPTIONS = [
   { id: 'home', label: 'Início', icon: '⌂' },
   { id: 'history', label: 'Histórico', icon: '↺' },
+  { id: 'stock', label: 'Estoque', icon: '▣' },
   { id: 'stats', label: 'Análises', icon: '▥' },
   { id: 'alerts', label: 'Alertas', icon: '!' },
   { id: 'profile', label: 'Perfil', icon: '♙' },
@@ -1080,9 +1081,61 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
                 Usar reserva
               </button>
             )}
-            <button type="button" className="primary compact-button" onClick={toggleReserveAvailability}>
-              {state.inventory?.reserveAvailable ? 'Remover' : 'Cadastrar'}
+            <button type="button" className="primary compact-button" onClick={() => setActivePage('stock')}>
+              Gerenciar
             </button>
+          </div>
+        </article>
+      </section>
+        </>
+      )}
+
+      {activePage === 'stock' && (
+        <>
+      <section className="stock-overview">
+        <article className={`stock-state-card in-use ${stats.status.tone}`}>
+          <div className="stock-state-visual">
+            <CylinderGauge percent={stats.percent} tone={stats.status.tone} />
+          </div>
+          <div className="stock-state-content">
+            <span className="eyebrow">Botijão em uso</span>
+            <h2>{currentBrand.name}</h2>
+            <p>Instalado em {formatDisplayDate(state.startedAt)}. Restam aproximadamente {stats.remainingDays} dias.</p>
+
+            <div className="stock-state-metrics">
+              <span>{stats.percent}%</span>
+              <small>{stats.status.label}</small>
+            </div>
+          </div>
+        </article>
+
+        <article className={`stock-state-card reserve ${state.inventory?.reserveAvailable ? 'available' : 'empty'}`}>
+          <div className="reserve-symbol" aria-hidden="true">
+            {state.inventory?.reserveAvailable ? 'P13' : '+'}
+          </div>
+          <div className="stock-state-content">
+            <span className="eyebrow">Botijão reserva</span>
+            <h2>{state.inventory?.reserveAvailable ? 'Disponível' : 'Não cadastrado'}</h2>
+            <p>
+              {state.inventory?.reserveAvailable
+                ? `${state.inventory.reserveBrand?.name || currentBrand.name} pronto para uso em uma emergência.`
+                : 'Cadastre um segundo botijão para controlar estoque e troca emergencial.'}
+            </p>
+
+            <div className="stock-actions">
+              {state.inventory?.reserveAvailable && (
+                <button type="button" className="primary" onClick={requestUseReserveCylinder}>
+                  Usar reserva
+                </button>
+              )}
+              <button
+                type="button"
+                className={state.inventory?.reserveAvailable ? 'ghost' : 'primary'}
+                onClick={toggleReserveAvailability}
+              >
+                {state.inventory?.reserveAvailable ? 'Remover reserva' : 'Cadastrar reserva'}
+              </button>
+            </div>
           </div>
         </article>
       </section>

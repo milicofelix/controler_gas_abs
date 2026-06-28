@@ -844,6 +844,135 @@ button.ghost,
   background: rgba(127, 29, 29, 0.3);
 }
 
+.stock-overview {
+  display: grid;
+  gap: 14px;
+}
+
+.stock-state-card {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 16px;
+  align-items: center;
+  border-radius: 22px;
+  padding: 18px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.stock-state-card.in-use {
+  background:
+    radial-gradient(circle at 14% 28%, color-mix(in srgb, var(--primary-end) 18%, transparent), transparent 36%),
+    var(--card-bg);
+}
+
+.stock-state-card.reserve.available {
+  border-color: rgba(34, 197, 94, 0.3);
+  background:
+    radial-gradient(circle at 12% 28%, rgba(34, 197, 94, 0.18), transparent 34%),
+    var(--card-bg);
+}
+
+.stock-state-card.reserve.empty {
+  border-style: dashed;
+  border-color: rgba(148, 163, 184, 0.34);
+}
+
+.stock-state-visual {
+  height: 160px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.stock-state-visual .cylinder-stage {
+  transform: scale(0.48);
+  transform-origin: center;
+  min-height: 300px;
+}
+
+.stock-state-content h2 {
+  margin: 7px 0 0;
+  color: var(--text-strong);
+  font-size: 24px;
+}
+
+.stock-state-content p {
+  margin: 9px 0 0;
+  color: var(--text-soft);
+  line-height: 1.45;
+}
+
+.stock-state-metrics {
+  display: inline-flex;
+  gap: 10px;
+  align-items: baseline;
+  margin-top: 14px;
+  border-radius: 999px;
+  padding: 8px 12px;
+  color: var(--text-strong);
+  background: color-mix(in srgb, var(--primary-end) 12%, transparent);
+}
+
+.stock-state-metrics span {
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.stock-state-metrics small {
+  color: var(--text-soft);
+  font-weight: 800;
+}
+
+.reserve-symbol {
+  display: grid;
+  place-items: center;
+  width: 120px;
+  height: 120px;
+  justify-self: center;
+  border-radius: 32px;
+  color: #fff;
+  background: linear-gradient(145deg, var(--brand-start), var(--brand-end));
+  box-shadow: inset 0 16px 28px rgba(255, 255, 255, 0.16), 0 20px 42px rgba(0, 0, 0, 0.18);
+  font-size: 30px;
+  font-weight: 900;
+}
+
+.stock-state-card.empty .reserve-symbol {
+  color: var(--primary-end);
+  background: color-mix(in srgb, var(--primary-end) 12%, transparent);
+  outline: 1px dashed color-mix(in srgb, var(--primary-end) 42%, transparent);
+  box-shadow: none;
+}
+
+.stock-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.stock-actions button {
+  min-height: 42px;
+}
+
+@media (max-width: 520px) {
+  .stock-state-card {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .stock-state-metrics {
+    justify-self: center;
+  }
+
+  .stock-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 .alert-summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2417,9 +2546,9 @@ button.ghost,
   box-sizing: border-box;
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 2px;
-  padding: 12px 10px max(10px, env(safe-area-inset-bottom));
+  padding: 10px 6px max(10px, env(safe-area-inset-bottom));
   color: var(--text-muted);
   background: rgba(255,255,255,.88);
   border-top: 1px solid var(--card-border);
@@ -2436,7 +2565,7 @@ button.ghost,
 }
 
 .bottom-nav small {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
 }
 
@@ -2877,10 +3006,10 @@ button.ghost,
   display: grid;
   gap: 3px;
   place-items: center;
-  min-height: 54px;
-  padding: 6px 4px;
+  min-height: 50px;
+  padding: 5px 2px;
   border: 0;
-  border-radius: 16px;
+  border-radius: 14px;
   color: inherit;
   background: transparent;
   font: inherit;
@@ -2889,7 +3018,7 @@ button.ghost,
 
 .bottom-nav button > span {
   display: block;
-  font-size: 23px;
+  font-size: 20px;
   line-height: 1;
 }
 
