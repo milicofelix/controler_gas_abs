@@ -958,6 +958,64 @@ button.ghost,
   min-height: 42px;
 }
 
+.reserve-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.reserve-details span {
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: var(--text-strong);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.reserve-purchase-card {
+  display: grid;
+  gap: 16px;
+  border-radius: 22px;
+  padding: 18px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.16);
+}
+
+.reserve-purchase-card h2 {
+  margin: 7px 0 0;
+  color: var(--text-strong);
+  font-size: 24px;
+}
+
+.reserve-purchase-card p {
+  margin: 8px 0 0;
+  color: var(--text-soft);
+  line-height: 1.45;
+}
+
+.reserve-purchase-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.reserve-purchase-form label {
+  display: grid;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.reserve-purchase-form button {
+  min-height: 48px;
+}
+
 @media (max-width: 520px) {
   .stock-state-card {
     grid-template-columns: 1fr;
@@ -969,6 +1027,10 @@ button.ghost,
   }
 
   .stock-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .reserve-purchase-form {
     grid-template-columns: 1fr;
   }
 }

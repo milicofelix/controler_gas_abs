@@ -21,11 +21,13 @@
 - Persistencia em MySQL via API Node/Express.
 - Fallback local no navegador quando a API estiver indisponivel.
 - Controle basico de botijao reserva: cadastrar, remover e usar reserva.
+- Tela de estoque com dois estados claros: botijao em uso e botijao reserva.
+- Registro de compra/reposicao do botijao reserva com marca, data e valor.
 - Cabecalho sem hora/bateria fake e logout explicito.
 
 ## Parcialmente pronto
 
-- Controle de estoque: hoje existe apenas o status do botijao reserva. Ainda falta fluxo completo de compra/reposicao do reserva depois que ele vira o botijao em uso.
+- Controle de estoque: ja existe fluxo de uso e reposicao do reserva. Ainda falta historico dedicado de compras de reserva.
 - Autenticacao: existe login funcional, mas senha ainda fica no payload do usuario. Para producao real, falta hash de senha e sessao/token no backend.
 - Admin: mostra consolidado geral, mas ainda nao tem filtros por regiao, periodo ou exportacao.
 - Alertas: notificacao local existe, mas falta lembrete recorrente e preferencia configuravel de dias/horario.
@@ -33,8 +35,7 @@
 
 ## Pendente recomendado
 
-- Criar tela de estoque com dois estados claros: botijao em uso e botijao reserva.
-- Registrar compra de novo botijao reserva com marca, valor e data.
+- Criar historico dedicado de compras/reposicoes de reserva.
 - Criar endpoint de autenticacao real no backend.
 - Gravar usuarios em tabelas normalizadas no MySQL futuramente, em vez de payload JSON unico.
 - Adicionar migracoes versionadas do banco.

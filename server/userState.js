@@ -36,7 +36,7 @@ function createDefaultGasState(today = formatDateInput()) {
     lastFinishedCycle: null,
     reminder: { enabled: false, scheduledFor: '' },
     currentBrand: normalizeBrand(DEFAULT_GAS_BRAND),
-    inventory: { reserveAvailable: false, reserveBrand: null },
+    inventory: { reserveAvailable: false, reserveBrand: null, reservePurchasedAt: '', reservePaidValue: '' },
   }
 }
 
@@ -62,6 +62,8 @@ function normalizeGasState(nextState, today = formatDateInput()) {
     inventory: {
       reserveAvailable: Boolean(nextState?.inventory?.reserveAvailable),
       reserveBrand: nextState?.inventory?.reserveBrand ? normalizeBrand(nextState.inventory.reserveBrand) : null,
+      reservePurchasedAt: nextState?.inventory?.reservePurchasedAt || '',
+      reservePaidValue: nextState?.inventory?.reservePaidValue || '',
     },
   }
 }

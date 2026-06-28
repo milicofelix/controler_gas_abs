@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import {
   DEFAULT_CYCLE_DAYS,
+  DEFAULT_GAS_BRAND,
   GAS_REMINDER_NOTIFICATION_ID,
   GAS_BRANDS,
   MOVING_AVERAGE_LIMIT,
@@ -523,6 +524,11 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
   const [reserveConfirmationOpen, setReserveConfirmationOpen] = useState(false)
   const [reserveReason, setReserveReason] = useState('acabou')
   const [reserveReasonNotes, setReserveReasonNotes] = useState('')
+  const [reserveForm, setReserveForm] = useState(() => ({
+    brandId: currentUser.state?.inventory?.reserveBrand?.id || currentUser.state?.currentBrand?.id || DEFAULT_GAS_BRAND.id,
+    purchasedAt: currentUser.state?.inventory?.reservePurchasedAt || formatDateInput(new Date()),
+    paidValue: currentUser.state?.inventory?.reservePaidValue || '',
+  }))
   const [notificationStatus, setNotificationStatus] = useState('')
   const [settingsStatus, setSettingsStatus] = useState('')
   const [brandUploadStatus, setBrandUploadStatus] = useState('')
@@ -718,12 +724,36 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
     )
   }
 
-  function toggleReserveAvailability() {
+  function updateReserveForm(field, value) {
+    setReserveForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
+  }
+
+  function registerReservePurchase(event) {
+    event.preventDefault()
+    const reserveBrand = GAS_BRANDS.find((brand) => brand.id === reserveForm.brandId) || DEFAULT_GAS_BRAND
+
     setState((current) => ({
       ...current,
       inventory: {
-        reserveAvailable: !current.inventory?.reserveAvailable,
-        reserveBrand: !current.inventory?.reserveAvailable ? normalizeBrand(current.currentBrand) : null,
+        reserveAvailable: true,
+        reserveBrand: normalizeBrand(reserveBrand),
+        reservePurchasedAt: reserveForm.purchasedAt || today,
+        reservePaidValue: reserveForm.paidValue || '',
+      },
+    }))
+  }
+
+  function removeReserveCylinder() {
+    setState((current) => ({
+      ...current,
+      inventory: {
+        reserveAvailable: false,
+        reserveBrand: null,
+        reservePurchasedAt: '',
+        reservePaidValue: '',
       },
     }))
   }
@@ -778,12 +808,21 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
       startedAt: today,
       history: nextHistory,
       lastFinishedCycle,
-      manual: createManualFields({ startedAt: today, endedAt: today }),
       currentBrand: reserveBrand,
       inventory: {
         reserveAvailable: false,
         reserveBrand: null,
+        reservePurchasedAt: '',
+        reservePaidValue: '',
       },
+      manual: createManualFields({
+        startedAt: today,
+        endedAt: today,
+        paidValue: state.inventory?.reservePaidValue || '',
+        notes: state.inventory?.reservePurchasedAt
+          ? `Botijão reserva comprado em ${formatDisplayDate(state.inventory.reservePurchasedAt)}.`
+          : '',
+      }),
       reminder: { enabled: false, scheduledFor: '' },
     }))
 
@@ -1122,22 +1161,80 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
                 : 'Cadastre um segundo botijão para controlar estoque e troca emergencial.'}
             </p>
 
-            <div className="stock-actions">
-              {state.inventory?.reserveAvailable && (
+            {state.inventory?.reserveAvailable && (
+              <div className="reserve-details">
+                <span>Compra: {formatDisplayDate(state.inventory.reservePurchasedAt)}</span>
+                {state.inventory.reservePaidValue && <span>Valor: {formatMoney(state.inventory.reservePaidValue)}</span>}
+              </div>
+            )}
+
+            {state.inventory?.reserveAvailable && (
+              <div className="stock-actions">
                 <button type="button" className="primary" onClick={requestUseReserveCylinder}>
                   Usar reserva
                 </button>
-              )}
-              <button
-                type="button"
-                className={state.inventory?.reserveAvailable ? 'ghost' : 'primary'}
-                onClick={toggleReserveAvailability}
-              >
-                {state.inventory?.reserveAvailable ? 'Remover reserva' : 'Cadastrar reserva'}
-              </button>
-            </div>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={removeReserveCylinder}
+                >
+                  Remover reserva
+                </button>
+              </div>
+            )}
           </div>
         </article>
+
+        <section className="reserve-purchase-card">
+          <div>
+            <span className="eyebrow">{state.inventory?.reserveAvailable ? 'Reposição' : 'Cadastrar reserva'}</span>
+            <h2>{state.inventory?.reserveAvailable ? 'Comprar novo reserva' : 'Registrar botijão reserva'}</h2>
+            <p>
+              {state.inventory?.reserveAvailable
+                ? 'Atualize estes dados quando comprar outro botijão para ficar guardado.'
+                : 'Informe os dados do botijão que ficará disponível para troca.'}
+            </p>
+          </div>
+
+          <form className="reserve-purchase-form" onSubmit={registerReservePurchase}>
+            <label>
+              Marca
+              <select value={reserveForm.brandId} onChange={(event) => updateReserveForm('brandId', event.target.value)}>
+                {GAS_BRANDS.map((brand) => (
+                  <option key={brand.id} value={brand.id}>{brand.name}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Data da compra
+              <input
+                type="date"
+                value={reserveForm.purchasedAt}
+                max={today}
+                onChange={(event) => updateReserveForm('purchasedAt', event.target.value || today)}
+                onInput={(event) => updateReserveForm('purchasedAt', event.target.value || today)}
+              />
+            </label>
+
+            <label>
+              Valor pago
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                value={reserveForm.paidValue}
+                onChange={(event) => updateReserveForm('paidValue', event.target.value)}
+                placeholder="Opcional"
+              />
+            </label>
+
+            <button type="submit" className="primary">
+              {state.inventory?.reserveAvailable ? 'Atualizar reserva' : 'Cadastrar reserva'}
+            </button>
+          </form>
+        </section>
       </section>
         </>
       )}
