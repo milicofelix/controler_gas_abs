@@ -519,6 +519,9 @@ function AdminDashboard({ users, onLogout }) {
 function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout }) {
   const [activePage, setActivePage] = useState('home')
   const [state, setState] = useState(() => normalizeGasState(currentUser.state))
+  const [reserveConfirmationOpen, setReserveConfirmationOpen] = useState(false)
+  const [reserveReason, setReserveReason] = useState('acabou')
+  const [reserveReasonNotes, setReserveReasonNotes] = useState('')
   const [notificationStatus, setNotificationStatus] = useState('')
   const [settingsStatus, setSettingsStatus] = useState('')
   const [brandUploadStatus, setBrandUploadStatus] = useState('')
@@ -724,7 +727,37 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
     }))
   }
 
-  function useReserveCylinder() {
+  function getReserveReasonText(reason, notes = '') {
+    const reasonLabels = {
+      acabou: 'Gás acabou.',
+      vazamento: 'Suspeita de vazamento.',
+      preventivo: 'Troca preventiva.',
+      outro: notes.trim() || 'Outro motivo informado.',
+    }
+
+    return reasonLabels[reason] || reasonLabels.outro
+  }
+
+  function requestUseReserveCylinder() {
+    if (stats.percent <= 10) {
+      applyReserveCylinder('Gás em nível crítico.')
+      return
+    }
+
+    setReserveConfirmationOpen(true)
+  }
+
+  function confirmUseReserveCylinder(event) {
+    event.preventDefault()
+    const reasonText = getReserveReasonText(reserveReason, reserveReasonNotes)
+
+    applyReserveCylinder(reasonText)
+    setReserveConfirmationOpen(false)
+    setReserveReason('acabou')
+    setReserveReasonNotes('')
+  }
+
+  function applyReserveCylinder(reasonText) {
     const reserveBrand = state.inventory?.reserveBrand
       ? normalizeBrand(state.inventory.reserveBrand)
       : currentBrand
@@ -734,7 +767,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
       endedAt: today,
       duration,
       paidValue: state.manual?.paidValue || '',
-      notes: state.manual?.notes || 'Troca pelo botijão reserva.',
+      notes: [state.manual?.notes, `Troca pelo botijão reserva. Motivo: ${reasonText}`].filter(Boolean).join(' '),
       brand: currentBrand,
     })
     const nextHistory = [lastFinishedCycle, ...state.history].slice(0, 8)
@@ -1043,7 +1076,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
           </div>
           <div className="reserve-actions">
             {state.inventory?.reserveAvailable && (
-              <button type="button" className="ghost compact-button" onClick={useReserveCylinder}>
+              <button type="button" className="ghost compact-button" onClick={requestUseReserveCylinder}>
                 Usar reserva
               </button>
             )}
@@ -1106,9 +1139,51 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
             <h2>Troque pelo reserva</h2>
             <p>Depois da troca, compre um novo botijão para voltar a ter estoque de segurança.</p>
           </div>
-          <button type="button" className="primary" onClick={useReserveCylinder}>
+          <button type="button" className="primary" onClick={requestUseReserveCylinder}>
             Trocar pelo reserva
           </button>
+        </section>
+      )}
+
+      {reserveConfirmationOpen && (
+        <section className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="reserve-confirm-title">
+          <form className="modal-card" onSubmit={confirmUseReserveCylinder}>
+            <div>
+              <span className="eyebrow">Confirmar troca</span>
+              <h2 id="reserve-confirm-title">Usar botijão reserva?</h2>
+              <p>O botijão atual ainda está com {stats.percent}% estimado. Informe o motivo para registrar a troca.</p>
+            </div>
+
+            <label>
+              Motivo
+              <select value={reserveReason} onChange={(event) => setReserveReason(event.target.value)}>
+                <option value="acabou">Acabou o gás</option>
+                <option value="vazamento">Suspeita de vazamento</option>
+                <option value="preventivo">Troca preventiva</option>
+                <option value="outro">Outro motivo</option>
+              </select>
+            </label>
+
+            {reserveReason === 'outro' && (
+              <label>
+                Observação
+                <textarea
+                  value={reserveReasonNotes}
+                  onChange={(event) => setReserveReasonNotes(event.target.value)}
+                  placeholder="Descreva o motivo da troca"
+                />
+              </label>
+            )}
+
+            <div className="modal-actions">
+              <button type="button" className="ghost" onClick={() => setReserveConfirmationOpen(false)}>
+                Cancelar
+              </button>
+              <button type="submit" className="primary">
+                Confirmar troca
+              </button>
+            </div>
+          </form>
         </section>
       )}
 

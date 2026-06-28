@@ -908,6 +908,55 @@ button.ghost,
   background: rgba(22, 101, 52, 0.14);
 }
 
+.modal-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(2, 6, 23, 0.62);
+  backdrop-filter: blur(10px);
+}
+
+.modal-card {
+  width: min(100%, 420px);
+  display: grid;
+  gap: 16px;
+  border-radius: 22px;
+  padding: 20px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.34);
+}
+
+.modal-card h2 {
+  margin: 6px 0 0;
+  color: var(--text-strong);
+  font-size: 24px;
+}
+
+.modal-card p {
+  margin: 8px 0 0;
+  color: var(--text-soft);
+  line-height: 1.45;
+}
+
+.modal-card label {
+  display: grid;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.modal-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
 .brand-form-panel,
 .profile-avatar-panel {
   display: grid;
@@ -1738,6 +1787,10 @@ button.ghost,
   }
 
   .demo-access-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-actions {
     grid-template-columns: 1fr;
   }
 
