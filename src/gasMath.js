@@ -110,6 +110,14 @@ export function formatMoney(value) {
   })
 }
 
+export function parseMoneyInput(value) {
+  const digits = String(value || '').replace(/\D/g, '')
+
+  if (!digits) return ''
+
+  return (Number(digits) / 100).toFixed(2)
+}
+
 export function addDays(date, days) {
   const nextDate = new Date(`${date}T00:00:00`)
   nextDate.setDate(nextDate.getDate() + Number(days))

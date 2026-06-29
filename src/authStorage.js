@@ -18,21 +18,29 @@ export const DEMO_USER_PASSWORD = 'casa123'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || ''
 
-export function createDefaultGasState(today = formatDateInput(new Date())) {
+export function createDefaultGasState(today = formatDateInput(new Date()), hasActiveCylinder = true) {
+  const startedAt = hasActiveCylinder ? today : ''
+
   return {
-    startedAt: today,
+    hasActiveCylinder,
+    startedAt,
     cycleDays: DEFAULT_CYCLE_DAYS,
     history: [],
-    manual: createManualFields({ startedAt: today, endedAt: today }),
+    manual: createManualFields({ startedAt, endedAt: today }),
     lastFinishedCycle: null,
     reminder: { enabled: false, scheduledFor: '' },
     currentBrand: normalizeBrand(DEFAULT_GAS_BRAND),
-    inventory: { reserveAvailable: false, reserveBrand: null },
+    inventory: { reserveAvailable: false, reserveBrand: null, reservePurchasedAt: '', reservePaidValue: '', reserveId: '' },
+    reserveHistory: [],
   }
 }
 
 export function normalizeGasState(nextState, today = formatDateInput(new Date())) {
-  const restoredStartedAt = nextState?.startedAt || today
+  const hasSavedState = nextState && typeof nextState === 'object'
+  const hasActiveCylinder = hasSavedState
+    ? (typeof nextState.hasActiveCylinder === 'boolean' ? nextState.hasActiveCylinder : Boolean(nextState.startedAt))
+    : false
+  const restoredStartedAt = hasActiveCylinder ? (nextState?.startedAt || today) : ''
   const restoredManual = nextState?.manual
     ? {
         installedAt: nextState.manual.installedAt || restoredStartedAt,
@@ -43,7 +51,8 @@ export function normalizeGasState(nextState, today = formatDateInput(new Date())
     : createManualFields({ startedAt: restoredStartedAt, endedAt: today })
 
   return {
-    startedAt: restoredManual.installedAt || restoredStartedAt,
+    hasActiveCylinder,
+    startedAt: hasActiveCylinder ? (restoredManual.installedAt || restoredStartedAt) : restoredStartedAt,
     cycleDays: DEFAULT_CYCLE_DAYS,
     history: normalizeHistory(nextState?.history),
     manual: restoredManual,
@@ -53,7 +62,11 @@ export function normalizeGasState(nextState, today = formatDateInput(new Date())
     inventory: {
       reserveAvailable: Boolean(nextState?.inventory?.reserveAvailable),
       reserveBrand: nextState?.inventory?.reserveBrand ? normalizeBrand(nextState.inventory.reserveBrand) : null,
+      reservePurchasedAt: nextState?.inventory?.reservePurchasedAt || '',
+      reservePaidValue: nextState?.inventory?.reservePaidValue || '',
+      reserveId: nextState?.inventory?.reserveId || '',
     },
+    reserveHistory: Array.isArray(nextState?.reserveHistory) ? nextState.reserveHistory : [],
   }
 }
 
@@ -210,7 +223,7 @@ export function createUser({ name, homeName, email, password }) {
     email: email.toLowerCase(),
     password,
     role: 'user',
-    state: createDefaultGasState(today),
+    state: createDefaultGasState(today, false),
     theme: 'blue-modern',
     residenceProfile: {
       city: '',

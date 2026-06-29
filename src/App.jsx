@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import {
   DEFAULT_CYCLE_DAYS,
+  DEFAULT_GAS_BRAND,
   GAS_REMINDER_NOTIFICATION_ID,
   GAS_BRANDS,
   MOVING_AVERAGE_LIMIT,
@@ -22,6 +23,7 @@ import {
   getReminderDate,
   getSmartAlerts,
   normalizeBrand,
+  parseMoneyInput,
 } from './gasMath'
 import {
   DEMO_USER_EMAIL,
@@ -56,6 +58,7 @@ function getThemeOption(themeId) {
 const PAGE_OPTIONS = [
   { id: 'home', label: 'Início', icon: '⌂' },
   { id: 'history', label: 'Histórico', icon: '↺' },
+  { id: 'stock', label: 'Estoque', icon: '▣' },
   { id: 'stats', label: 'Análises', icon: '▥' },
   { id: 'alerts', label: 'Alertas', icon: '!' },
   { id: 'profile', label: 'Perfil', icon: '♙' },
@@ -104,12 +107,23 @@ function buildIntelligence(history) {
 
 function getUserStats(user, today = formatDateInput(new Date())) {
   const state = normalizeGasState(user.state, today)
+  const hasActiveCylinder = Boolean(state.hasActiveCylinder && state.startedAt)
   const intelligence = buildIntelligence(state.history)
-  const stats = calculateStats({
-    startedAt: state.startedAt,
-    today,
-    projectedCycleDays: intelligence.projectedCycleDays,
-  })
+  const stats = hasActiveCylinder
+    ? calculateStats({
+        startedAt: state.startedAt,
+        today,
+        projectedCycleDays: intelligence.projectedCycleDays,
+      })
+    : {
+        elapsedDays: 0,
+        percent: 0,
+        remainingDays: 0,
+        buyInDays: 0,
+        status: { label: 'Sem botijão', tone: 'empty' },
+        expectedEnd: '',
+        recommendation: 'Cadastre um botijão',
+      }
 
   return { state, intelligence, stats }
 }
@@ -519,6 +533,15 @@ function AdminDashboard({ users, onLogout }) {
 function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout }) {
   const [activePage, setActivePage] = useState('home')
   const [state, setState] = useState(() => normalizeGasState(currentUser.state))
+  const [reserveConfirmationOpen, setReserveConfirmationOpen] = useState(false)
+  const [resetConfirmationOpen, setResetConfirmationOpen] = useState(false)
+  const [reserveReason, setReserveReason] = useState('acabou')
+  const [reserveReasonNotes, setReserveReasonNotes] = useState('')
+  const [reserveForm, setReserveForm] = useState(() => ({
+    brandId: currentUser.state?.inventory?.reserveBrand?.id || currentUser.state?.currentBrand?.id || DEFAULT_GAS_BRAND.id,
+    purchasedAt: currentUser.state?.inventory?.reservePurchasedAt || formatDateInput(new Date()),
+    paidValue: currentUser.state?.inventory?.reservePaidValue || '',
+  }))
   const [notificationStatus, setNotificationStatus] = useState('')
   const [settingsStatus, setSettingsStatus] = useState('')
   const [brandUploadStatus, setBrandUploadStatus] = useState('')
@@ -535,22 +558,43 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
   const currentBrand = normalizeBrand(state.currentBrand)
 
   const today = formatDateInput(new Date())
+  const hasActiveCylinder = Boolean(state.hasActiveCylinder && state.startedAt)
 
   const intelligence = useMemo(() => buildIntelligence(state.history), [state.history])
 
-  const stats = useMemo(() => calculateStats({
-    startedAt: state.startedAt,
-    today,
-    projectedCycleDays: intelligence.projectedCycleDays,
-  }), [state.startedAt, intelligence.projectedCycleDays, today])
+  const stats = useMemo(() => (
+    hasActiveCylinder
+      ? calculateStats({
+          startedAt: state.startedAt,
+          today,
+          projectedCycleDays: intelligence.projectedCycleDays,
+        })
+      : {
+          elapsedDays: 0,
+          percent: 0,
+          remainingDays: 0,
+          buyInDays: 0,
+          status: { label: 'Sem botijão', tone: 'empty' },
+          expectedEnd: '',
+          recommendation: 'Cadastre um botijão',
+        }
+  ), [hasActiveCylinder, state.startedAt, intelligence.projectedCycleDays, today])
 
-  const visualAlert = getAlert(stats.percent)
-  const smartAlerts = useMemo(() => getSmartAlerts({
-    stats,
-    reserveAvailable: state.inventory?.reserveAvailable,
-    reminderEnabled: state.reminder?.enabled,
-    scheduledFor: state.reminder?.scheduledFor,
-  }), [state.inventory?.reserveAvailable, state.reminder?.enabled, state.reminder?.scheduledFor, stats])
+  const visualAlert = hasActiveCylinder ? getAlert(stats.percent) : null
+  const smartAlerts = useMemo(() => (
+    hasActiveCylinder
+      ? getSmartAlerts({
+          stats,
+          reserveAvailable: state.inventory?.reserveAvailable,
+          reminderEnabled: state.reminder?.enabled,
+          scheduledFor: state.reminder?.scheduledFor,
+        })
+      : [{
+          tone: 'stable',
+          title: 'Nenhum botijão em uso',
+          message: 'Cadastre a data de instalação para iniciar o acompanhamento.',
+        }]
+  ), [hasActiveCylinder, state.inventory?.reserveAvailable, state.reminder?.enabled, state.reminder?.scheduledFor, stats])
 
   const pageTitle = PAGE_OPTIONS.find((page) => page.id === activePage)?.label || 'Início'
   const brandStats = useMemo(() => calculateBrandStats(state.history), [state.history])
@@ -633,7 +677,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
 
     setState((current) => ({
       ...current,
-      startedAt: installedAt,
+      startedAt: current.hasActiveCylinder ? installedAt : current.startedAt,
       manual: {
         ...current.manual,
         installedAt,
@@ -714,42 +758,169 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
     )
   }
 
-  function toggleReserveAvailability() {
-    setState((current) => ({
+  function updateReserveForm(field, value) {
+    setReserveForm((current) => ({
       ...current,
-      inventory: {
-        reserveAvailable: !current.inventory?.reserveAvailable,
-        reserveBrand: !current.inventory?.reserveAvailable ? normalizeBrand(current.currentBrand) : null,
-      },
+      [field]: field === 'paidValue' ? parseMoneyInput(value) : value,
     }))
   }
 
-  function useReserveCylinder() {
-    const reserveBrand = state.inventory?.reserveBrand
-      ? normalizeBrand(state.inventory.reserveBrand)
-      : currentBrand
-    const duration = Math.max(1, daysBetween(state.startedAt, today))
-    const lastFinishedCycle = createHistoryEntry({
-      installedAt: state.startedAt,
-      endedAt: today,
-      duration,
-      paidValue: state.manual?.paidValue || '',
-      notes: state.manual?.notes || 'Troca pelo botijão reserva.',
-      brand: currentBrand,
+  function createReserveHistoryEntry({ brand, purchasedAt, paidValue = '', status = 'available', usedAt = '', notes = '' }) {
+    const uniqueSuffix = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const normalizedBrand = normalizeBrand(brand)
+
+    return {
+      id: `${purchasedAt}-${normalizedBrand.id}-${uniqueSuffix}`,
+      brandId: normalizedBrand.id,
+      brandName: normalizedBrand.name,
+      brandLogo: normalizedBrand.logo,
+      purchasedAt,
+      paidValue,
+      status,
+      usedAt,
+      notes,
+      createdAt: today,
+    }
+  }
+
+  function updateReserveHistoryStatus(history = [], reserveId, status, extras = {}) {
+    if (!reserveId) return history
+
+    return history.map((entry) => (
+      entry.id === reserveId ? { ...entry, status, ...extras } : entry
+    ))
+  }
+
+  function getReserveStatusLabel(status) {
+    const statusLabels = {
+      available: 'Disponível',
+      used: 'Usado',
+      removed: 'Removido',
+      replaced: 'Substituído',
+    }
+
+    return statusLabels[status] || 'Registrado'
+  }
+
+  function registerReservePurchase(event) {
+    event.preventDefault()
+    const reserveBrand = GAS_BRANDS.find((brand) => brand.id === reserveForm.brandId) || DEFAULT_GAS_BRAND
+    const purchasedAt = reserveForm.purchasedAt || today
+    const reserveEntry = createReserveHistoryEntry({
+      brand: reserveBrand,
+      purchasedAt,
+      paidValue: reserveForm.paidValue || '',
     })
-    const nextHistory = [lastFinishedCycle, ...state.history].slice(0, 8)
 
     setState((current) => ({
       ...current,
+      inventory: {
+        reserveAvailable: true,
+        reserveBrand: normalizeBrand(reserveBrand),
+        reservePurchasedAt: purchasedAt,
+        reservePaidValue: reserveForm.paidValue || '',
+        reserveId: reserveEntry.id,
+      },
+      reserveHistory: [
+        reserveEntry,
+        ...updateReserveHistoryStatus(current.reserveHistory, current.inventory?.reserveId, 'replaced', {
+          notes: 'Substituído por nova compra de reserva.',
+        }),
+      ].slice(0, 20),
+    }))
+  }
+
+  function removeReserveCylinder() {
+    setState((current) => ({
+      ...current,
+      inventory: {
+        reserveAvailable: false,
+        reserveBrand: null,
+        reservePurchasedAt: '',
+        reservePaidValue: '',
+        reserveId: '',
+      },
+      reserveHistory: updateReserveHistoryStatus(current.reserveHistory, current.inventory?.reserveId, 'removed', {
+        usedAt: today,
+        notes: 'Reserva removida manualmente.',
+      }),
+    }))
+  }
+
+  function getReserveReasonText(reason, notes = '') {
+    const reasonLabels = {
+      acabou: 'Gás acabou.',
+      vazamento: 'Suspeita de vazamento.',
+      preventivo: 'Troca preventiva.',
+      outro: notes.trim() || 'Outro motivo informado.',
+    }
+
+    return reasonLabels[reason] || reasonLabels.outro
+  }
+
+  function requestUseReserveCylinder() {
+    if (stats.percent <= 10) {
+      applyReserveCylinder('Gás em nível crítico.')
+      return
+    }
+
+    setReserveConfirmationOpen(true)
+  }
+
+  function confirmUseReserveCylinder(event) {
+    event.preventDefault()
+    const reasonText = getReserveReasonText(reserveReason, reserveReasonNotes)
+
+    applyReserveCylinder(reasonText)
+    setReserveConfirmationOpen(false)
+    setReserveReason('acabou')
+    setReserveReasonNotes('')
+  }
+
+  function applyReserveCylinder(reasonText) {
+    const reserveBrand = state.inventory?.reserveBrand
+      ? normalizeBrand(state.inventory.reserveBrand)
+      : currentBrand
+    const lastFinishedCycle = hasActiveCylinder
+      ? createHistoryEntry({
+          installedAt: state.startedAt,
+          endedAt: today,
+          duration: Math.max(1, daysBetween(state.startedAt, today)),
+          paidValue: state.manual?.paidValue || '',
+          notes: [state.manual?.notes, `Troca pelo botijão reserva. Motivo: ${reasonText}`].filter(Boolean).join(' '),
+          brand: currentBrand,
+        })
+      : null
+    const nextHistory = lastFinishedCycle ? [lastFinishedCycle, ...state.history].slice(0, 8) : state.history
+
+    setState((current) => ({
+      ...current,
+      hasActiveCylinder: true,
       startedAt: today,
       history: nextHistory,
       lastFinishedCycle,
-      manual: createManualFields({ startedAt: today, endedAt: today }),
       currentBrand: reserveBrand,
       inventory: {
         reserveAvailable: false,
         reserveBrand: null,
+        reservePurchasedAt: '',
+        reservePaidValue: '',
+        reserveId: '',
       },
+      reserveHistory: updateReserveHistoryStatus(current.reserveHistory, state.inventory?.reserveId, 'used', {
+        usedAt: today,
+        notes: `Usado como botijão principal. Motivo: ${reasonText}`,
+      }),
+      manual: createManualFields({
+        startedAt: today,
+        endedAt: today,
+        paidValue: state.inventory?.reservePaidValue || '',
+        notes: state.inventory?.reservePurchasedAt
+          ? `Botijão reserva comprado em ${formatDisplayDate(state.inventory.reservePurchasedAt)}.`
+          : '',
+      }),
       reminder: { enabled: false, scheduledFor: '' },
     }))
 
@@ -761,12 +932,32 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
       ...current,
       manual: {
         ...current.manual,
-        [field]: value,
+        [field]: field === 'paidValue' ? parseMoneyInput(value) : value,
       },
     }))
   }
 
   function registerCylinderChange() {
+    if (!hasActiveCylinder) {
+      const installedAt = state.manual?.installedAt || today
+
+      setState((current) => ({
+        ...current,
+        hasActiveCylinder: true,
+        startedAt: installedAt,
+        manual: createManualFields({
+          startedAt: installedAt,
+          endedAt: installedAt,
+          paidValue: state.manual?.paidValue || '',
+          notes: state.manual?.notes || '',
+        }),
+        reminder: { enabled: false, scheduledFor: '' },
+      }))
+
+      void cancelGasReminder()
+      return
+    }
+
     const endedAt = state.manual?.endedAt || today
     const duration = Math.max(1, daysBetween(state.startedAt, endedAt))
     const lastFinishedCycle = createHistoryEntry({
@@ -780,6 +971,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
     const nextHistory = [lastFinishedCycle, ...state.history].slice(0, 8)
 
     setState({
+      hasActiveCylinder: true,
       startedAt: endedAt,
       cycleDays: DEFAULT_CYCLE_DAYS,
       history: nextHistory,
@@ -787,6 +979,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
       lastFinishedCycle,
       currentBrand,
       inventory: state.inventory || { reserveAvailable: false, reserveBrand: null },
+      reserveHistory: state.reserveHistory || [],
       reminder: { enabled: false, scheduledFor: '' },
     })
 
@@ -796,6 +989,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
   function startNewCylinder() {
     setState((current) => ({
       ...current,
+      hasActiveCylinder: true,
       startedAt: today,
       manual: createManualFields({ startedAt: today, endedAt: today }),
       reminder: { enabled: false, scheduledFor: '' },
@@ -804,8 +998,13 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
     void cancelGasReminder()
   }
 
-  function resetDemo() {
-    setState(createDefaultGasState(today))
+  function requestResetDemo() {
+    setResetConfirmationOpen(true)
+  }
+
+  function confirmResetDemo() {
+    setState(createDefaultGasState(today, false))
+    setResetConfirmationOpen(false)
     void cancelGasReminder()
   }
 
@@ -849,7 +1048,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
         const parsed = JSON.parse(reader.result)
         const nextState = parsed.data || parsed
 
-        if (!nextState || typeof nextState !== 'object' || !nextState.startedAt) {
+        if (!nextState || typeof nextState !== 'object' || (!nextState.startedAt && typeof nextState.hasActiveCylinder !== 'boolean')) {
           throw new Error('backup-invalido')
         }
 
@@ -866,6 +1065,11 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
   }
 
   async function scheduleBuyReminder() {
+    if (!hasActiveCylinder) {
+      setNotificationStatus('Cadastre um botijão em uso antes de ativar lembrete.')
+      return
+    }
+
     setNotificationStatus('Configurando lembrete...')
 
     try {
@@ -927,7 +1131,14 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
       <section className="hero-card">
         <div className="hero-copy">
           <div className="brand-row">
-            <AppLogo className="header-logo" />
+            <button
+              type="button"
+              className="header-logo-button"
+              onClick={() => setActivePage('home')}
+              aria-label="Ir para a tela inicial"
+            >
+              <AppLogo className="header-logo" />
+            </button>
             <span className="eyebrow">{currentUser.homeName}</span>
           </div>
           <h1>Meu Gás</h1>
@@ -964,7 +1175,9 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
           <strong>{stats.percent}%</strong>
           <div className={`mini-level ${stats.status.tone}`}>☻ Nível: {stats.status.label}</div>
           <p>
-            {intelligence.isUsingRealAverage
+            {!hasActiveCylinder
+              ? 'Cadastre a instalação para iniciar o acompanhamento'
+              : intelligence.isUsingRealAverage
               ? 'Estimativa baseada no seu consumo médio'
               : 'Estimativa baseada em consumo inicial'}
           </p>
@@ -989,11 +1202,11 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
       <section className="metrics-grid">
         <article>
           <span>Dias de uso</span>
-          <strong>{stats.elapsedDays}</strong>
+          <strong>{hasActiveCylinder ? stats.elapsedDays : '-'}</strong>
         </article>
         <article>
           <span>Dias restantes</span>
-          <strong>{stats.remainingDays}</strong>
+          <strong>{hasActiveCylinder ? stats.remainingDays : '-'}</strong>
         </article>
         <article>
           <span>Média de consumo</span>
@@ -1005,8 +1218,8 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
       <section className="forecast-card">
         <div>
           <span className="eyebrow">Previsão de término</span>
-          <h2>{formatDisplayDate(stats.expectedEnd)}</h2>
-          <p>Em ~{stats.remainingDays} dias</p>
+          <h2>{hasActiveCylinder ? formatDisplayDate(stats.expectedEnd) : 'Sem previsão'}</h2>
+          <p>{hasActiveCylinder ? `Em ~${stats.remainingDays} dias` : 'Informe a data de instalação'}</p>
         </div>
         <div className={`forecast-ring ${stats.status.tone}`} style={{ '--gas-progress': stats.percent }} aria-hidden="true">
           <span>▣</span>
@@ -1015,7 +1228,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
 
       <section className="quick-actions-card">
         <button type="button" className="primary register-main-button" onClick={() => setActivePage('history')}>
-          Registrar novo botijão
+          {hasActiveCylinder ? 'Registrar novo botijão' : 'Iniciar controle'}
         </button>
       </section>
 
@@ -1025,7 +1238,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
             <span className="eyebrow">Botijão atual</span>
             <h2>{currentBrand.name}</h2>
             <p>
-              Compra: {formatDisplayDate(state.startedAt)}
+              {hasActiveCylinder ? `Compra: ${formatDisplayDate(state.startedAt)}` : 'Nenhum botijão em uso'}
             </p>
           </div>
           <BrandLogo brand={currentBrand} />
@@ -1043,15 +1256,157 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
           </div>
           <div className="reserve-actions">
             {state.inventory?.reserveAvailable && (
-              <button type="button" className="ghost compact-button" onClick={useReserveCylinder}>
+              <button type="button" className="ghost compact-button" onClick={requestUseReserveCylinder}>
                 Usar reserva
               </button>
             )}
-            <button type="button" className="primary compact-button" onClick={toggleReserveAvailability}>
-              {state.inventory?.reserveAvailable ? 'Remover' : 'Cadastrar'}
+            <button type="button" className="primary compact-button" onClick={() => setActivePage('stock')}>
+              Gerenciar
             </button>
           </div>
         </article>
+      </section>
+        </>
+      )}
+
+      {activePage === 'stock' && (
+        <>
+      <section className="stock-overview">
+        <article className={`stock-state-card in-use ${stats.status.tone}`}>
+          <div className="stock-state-visual">
+            <CylinderGauge percent={stats.percent} tone={stats.status.tone} />
+          </div>
+          <div className="stock-state-content">
+            <span className="eyebrow">Botijão em uso</span>
+            <h2>{hasActiveCylinder ? currentBrand.name : 'Não cadastrado'}</h2>
+            <p>
+              {hasActiveCylinder
+                ? `Instalado em ${formatDisplayDate(state.startedAt)}. Restam aproximadamente ${stats.remainingDays} dias.`
+                : 'Cadastre a data de instalação para começar o controle.'}
+            </p>
+
+            <div className="stock-state-metrics">
+              <span>{stats.percent}%</span>
+              <small>{stats.status.label}</small>
+            </div>
+          </div>
+        </article>
+
+        <article className={`stock-state-card reserve ${state.inventory?.reserveAvailable ? 'available' : 'empty'}`}>
+          <div className="reserve-symbol" aria-hidden="true">
+            {state.inventory?.reserveAvailable ? 'P13' : '+'}
+          </div>
+          <div className="stock-state-content">
+            <span className="eyebrow">Botijão reserva</span>
+            <h2>{state.inventory?.reserveAvailable ? 'Disponível' : 'Não cadastrado'}</h2>
+            <p>
+              {state.inventory?.reserveAvailable
+                ? `${state.inventory.reserveBrand?.name || currentBrand.name} pronto para uso em uma emergência.`
+                : 'Cadastre um segundo botijão para controlar estoque e troca emergencial.'}
+            </p>
+
+            {state.inventory?.reserveAvailable && (
+              <div className="reserve-details">
+                <span>Compra: {formatDisplayDate(state.inventory.reservePurchasedAt)}</span>
+                {state.inventory.reservePaidValue && <span>Valor: {formatMoney(state.inventory.reservePaidValue)}</span>}
+              </div>
+            )}
+
+            {state.inventory?.reserveAvailable && (
+              <div className="stock-actions">
+                <button type="button" className="primary" onClick={requestUseReserveCylinder}>
+                  Usar reserva
+                </button>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={removeReserveCylinder}
+                >
+                  Remover reserva
+                </button>
+              </div>
+            )}
+          </div>
+        </article>
+
+        <section className="reserve-purchase-card">
+          <div>
+            <span className="eyebrow">{state.inventory?.reserveAvailable ? 'Reposição' : 'Cadastrar reserva'}</span>
+            <h2>{state.inventory?.reserveAvailable ? 'Comprar novo reserva' : 'Registrar botijão reserva'}</h2>
+            <p>
+              {state.inventory?.reserveAvailable
+                ? 'Atualize estes dados quando comprar outro botijão para ficar guardado.'
+                : 'Informe os dados do botijão que ficará disponível para troca.'}
+            </p>
+          </div>
+
+          <form className="reserve-purchase-form" onSubmit={registerReservePurchase}>
+            <label>
+              Marca
+              <select value={reserveForm.brandId} onChange={(event) => updateReserveForm('brandId', event.target.value)}>
+                {GAS_BRANDS.map((brand) => (
+                  <option key={brand.id} value={brand.id}>{brand.name}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Data da compra
+              <input
+                type="date"
+                value={reserveForm.purchasedAt}
+                max={today}
+                onChange={(event) => updateReserveForm('purchasedAt', event.target.value || today)}
+                onInput={(event) => updateReserveForm('purchasedAt', event.target.value || today)}
+              />
+            </label>
+
+            <label>
+              Valor pago
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formatMoney(reserveForm.paidValue)}
+                onChange={(event) => updateReserveForm('paidValue', event.target.value)}
+                placeholder="Opcional"
+              />
+            </label>
+
+            <button type="submit" className="primary">
+              {state.inventory?.reserveAvailable ? 'Atualizar reserva' : 'Cadastrar reserva'}
+            </button>
+          </form>
+        </section>
+
+        <section className="reserve-history-card">
+          <div>
+            <span className="eyebrow">Histórico do reserva</span>
+            <h2>Compras e reposições</h2>
+          </div>
+
+          {state.reserveHistory?.length > 0 ? (
+            <div className="reserve-history-list">
+              {state.reserveHistory.slice(0, 6).map((entry) => (
+                <article key={entry.id} className={`reserve-history-item ${entry.status}`}>
+                  <div>
+                    <strong>{entry.brandName}</strong>
+                    <span>
+                      Compra: {formatDisplayDate(entry.purchasedAt)}
+                      {entry.usedAt && ` • Saída: ${formatDisplayDate(entry.usedAt)}`}
+                    </span>
+                    {entry.notes && <small>{entry.notes}</small>}
+                  </div>
+                  <div className="reserve-history-meta">
+                    <span>{getReserveStatusLabel(entry.status)}</span>
+                    {entry.paidValue && <strong>{formatMoney(entry.paidValue)}</strong>}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-state">Nenhuma compra de reserva registrada ainda.</p>
+          )}
+        </section>
       </section>
         </>
       )}
@@ -1065,11 +1420,11 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
         </article>
         <article className={stats.percent <= 10 ? 'critical' : 'stable'}>
           <span>Estoque</span>
-          <strong>{stats.percent <= 10 ? 'Crítico' : state.inventory?.reserveAvailable ? 'Reserva ativa' : 'Monitorado'}</strong>
+          <strong>{!hasActiveCylinder ? 'Sem botijão' : stats.percent <= 10 ? 'Crítico' : state.inventory?.reserveAvailable ? 'Reserva ativa' : 'Monitorado'}</strong>
         </article>
         <article>
           <span>Termina</span>
-          <strong>{formatDisplayDate(stats.expectedEnd)}</strong>
+          <strong>{hasActiveCylinder ? formatDisplayDate(stats.expectedEnd) : 'Sem previsão'}</strong>
         </article>
         <article className={state.reminder?.enabled ? 'stable' : ''}>
           <span>Lembrete</span>
@@ -1093,22 +1448,68 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
         <section className="alert-card ok">
           <div>
             <span className="eyebrow">Alertas</span>
-            <h2>Nenhum alerta crítico agora</h2>
-            <p>O botijão está dentro do nível esperado. Você ainda pode ativar o lembrete de compra.</p>
+            <h2>{hasActiveCylinder ? 'Nenhum alerta crítico agora' : 'Nenhum botijão em uso'}</h2>
+            <p>
+              {hasActiveCylinder
+                ? 'O botijão está dentro do nível esperado. Você ainda pode ativar o lembrete de compra.'
+                : 'Cadastre a data de instalação para habilitar alertas e previsão de término.'}
+            </p>
           </div>
         </section>
       )}
 
-      {state.inventory?.reserveAvailable && stats.percent <= 10 && (
+      {hasActiveCylinder && state.inventory?.reserveAvailable && stats.percent <= 10 && (
         <section className="stock-card critical">
           <div>
             <span className="eyebrow">Ação recomendada</span>
             <h2>Troque pelo reserva</h2>
             <p>Depois da troca, compre um novo botijão para voltar a ter estoque de segurança.</p>
           </div>
-          <button type="button" className="primary" onClick={useReserveCylinder}>
+          <button type="button" className="primary" onClick={requestUseReserveCylinder}>
             Trocar pelo reserva
           </button>
+        </section>
+      )}
+
+      {reserveConfirmationOpen && (
+        <section className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="reserve-confirm-title">
+          <form className="modal-card" onSubmit={confirmUseReserveCylinder}>
+            <div>
+              <span className="eyebrow">Confirmar troca</span>
+              <h2 id="reserve-confirm-title">Usar botijão reserva?</h2>
+              <p>O botijão atual ainda está com {stats.percent}% estimado. Informe o motivo para registrar a troca.</p>
+            </div>
+
+            <label>
+              Motivo
+              <select value={reserveReason} onChange={(event) => setReserveReason(event.target.value)}>
+                <option value="acabou">Acabou o gás</option>
+                <option value="vazamento">Suspeita de vazamento</option>
+                <option value="preventivo">Troca preventiva</option>
+                <option value="outro">Outro motivo</option>
+              </select>
+            </label>
+
+            {reserveReason === 'outro' && (
+              <label>
+                Observação
+                <textarea
+                  value={reserveReasonNotes}
+                  onChange={(event) => setReserveReasonNotes(event.target.value)}
+                  placeholder="Descreva o motivo da troca"
+                />
+              </label>
+            )}
+
+            <div className="modal-actions">
+              <button type="button" className="ghost" onClick={() => setReserveConfirmationOpen(false)}>
+                Cancelar
+              </button>
+              <button type="submit" className="primary">
+                Confirmar troca
+              </button>
+            </div>
+          </form>
         </section>
       )}
 
@@ -1116,7 +1517,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
         <div className="intelligence-header">
           <div>
             <span className="eyebrow">Lembrete</span>
-            <h2>{stats.recommendation}</h2>
+          <h2>{stats.recommendation}</h2>
           </div>
           <div className="intelligence-badge">
             {intelligence.isUsingRealAverage ? 'Média real' : 'Base inicial'}
@@ -1126,11 +1527,11 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
         <div className="intelligence-grid">
           <article>
             <span>Comprar em</span>
-            <strong>{stats.buyInDays} dias</strong>
+            <strong>{hasActiveCylinder ? `${stats.buyInDays} dias` : '-'}</strong>
           </article>
           <article>
             <span>Previsão</span>
-            <strong>{formatDisplayDate(stats.expectedEnd)}</strong>
+            <strong>{hasActiveCylinder ? formatDisplayDate(stats.expectedEnd) : 'Sem previsão'}</strong>
           </article>
         </div>
 
@@ -1160,37 +1561,51 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
       <section className="form-card">
         <div className="form-header">
           <span className="eyebrow">Controle manual</span>
-          <h2>Troca do botijão</h2>
+          <h2>{hasActiveCylinder ? 'Encerrar ciclo atual' : 'Iniciar botijão'}</h2>
         </div>
 
         <label>
           Data da instalação
-          <input type="date" value={state.startedAt} max={today} onChange={updateStartedAt} onInput={updateStartedAt} />
-        </label>
-
-        <label>
-          Data da troca
           <input
             type="date"
-            value={state.manual?.endedAt || today}
-            min={state.startedAt}
+            value={state.manual?.installedAt || state.startedAt || ''}
             max={today}
-            onChange={(event) => updateManualField('endedAt', event.target.value || today)}
-            onInput={(event) => updateManualField('endedAt', event.target.value || today)}
+            disabled={hasActiveCylinder}
+            onChange={updateStartedAt}
+            onInput={updateStartedAt}
           />
+          <small className="field-hint">
+            {hasActiveCylinder
+              ? 'Esta é a data em que o botijão atual entrou em uso e fica travada para manter o cálculo correto.'
+              : 'Informe quando este botijão foi instalado. Depois de iniciar, esta data fica fixa.'}
+          </small>
         </label>
+
+        {hasActiveCylinder && (
+          <label>
+            Data em que acabou
+            <input
+              type="date"
+              value={state.manual?.endedAt || state.startedAt || today}
+              min={state.startedAt || undefined}
+              max={today}
+              onChange={(event) => updateManualField('endedAt', event.target.value || today)}
+              onInput={(event) => updateManualField('endedAt', event.target.value || today)}
+            />
+            <small className="field-hint">
+              Use este campo somente quando for registrar o fim deste botijão.
+            </small>
+          </label>
+        )}
 
         <label>
           Valor pago
           <input
-            type="number"
-            min="0"
-            step="0.01"
-            inputMode="decimal"
+            type="text"
+            inputMode="numeric"
             placeholder="Opcional"
-            value={state.manual?.paidValue || ''}
+            value={formatMoney(state.manual?.paidValue)}
             onChange={(event) => updateManualField('paidValue', event.target.value)}
-            onInput={(event) => updateManualField('paidValue', event.target.value)}
           />
         </label>
 
@@ -1264,10 +1679,10 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
 
         <div className="actions">
           <button type="button" className="primary" onClick={registerCylinderChange}>
-            Registrar troca
+            {hasActiveCylinder ? 'Registrar botijão acabou' : 'Iniciar controle'}
           </button>
           <button type="button" onClick={startNewCylinder}>Iniciar botijão hoje</button>
-          <button type="button" className="ghost" onClick={resetDemo}>Resetar</button>
+          <button type="button" className="ghost" onClick={requestResetDemo}>Resetar</button>
         </div>
 
         {state.lastFinishedCycle && (
@@ -1622,6 +2037,38 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
           </div>
         )}
       </section>
+      )}
+
+      {resetConfirmationOpen && (
+        <section className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="reset-confirm-title">
+          <div className="modal-card danger-modal">
+            <div>
+              <span className="eyebrow">Ação irreversível</span>
+              <h2 id="reset-confirm-title">Resetar todos os dados?</h2>
+              <p>
+                Esta ação apaga o controle atual desta casa para começar do zero.
+                Use somente se os dados foram cadastrados errado, se está testando o app,
+                ou se deseja limpar o histórico local deste usuário.
+              </p>
+            </div>
+
+            <ul className="reset-warning-list">
+              <li>Botijão em uso e previsão atual</li>
+              <li>Histórico de trocas e médias calculadas</li>
+              <li>Botijão reserva e histórico de estoque</li>
+              <li>Lembretes e alertas configurados</li>
+            </ul>
+
+            <div className="modal-actions">
+              <button type="button" className="ghost" onClick={() => setResetConfirmationOpen(false)}>
+                Cancelar
+              </button>
+              <button type="button" className="danger-button" onClick={confirmResetDemo}>
+                Sim, resetar
+              </button>
+            </div>
+          </div>
+        </section>
       )}
 
       <nav className="bottom-nav" aria-label="Navegação principal">

@@ -10,6 +10,7 @@ import {
   detectConsumptionPattern,
   getAlert,
   getSmartAlerts,
+  parseMoneyInput,
 } from './gasMath.js'
 
 test('calcula dias entre datas sem contar o dia de instalacao', () => {
@@ -36,6 +37,12 @@ test('soma dias para previsao de fim', () => {
 
 test('calcula media arredondada dos ciclos', () => {
   assert.equal(averageDuration([{ duration: 30 }, { duration: 10 }]), 20)
+})
+
+test('normaliza valor monetario digitado com mascara brasileira', () => {
+  assert.equal(parseMoneyInput('R$ 120,50'), '120.50')
+  assert.equal(parseMoneyInput('12050'), '120.50')
+  assert.equal(parseMoneyInput(''), '')
 })
 
 test('identifica alertas baixo e critico', () => {
