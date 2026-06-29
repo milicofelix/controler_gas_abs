@@ -23,11 +23,12 @@
 - Controle basico de botijao reserva: cadastrar, remover e usar reserva.
 - Tela de estoque com dois estados claros: botijao em uso e botijao reserva.
 - Registro de compra/reposicao do botijao reserva com marca, data e valor.
+- Historico dedicado de compras/reposicoes de reserva com status.
 - Cabecalho sem hora/bateria fake e logout explicito.
 
 ## Parcialmente pronto
 
-- Controle de estoque: ja existe fluxo de uso e reposicao do reserva. Ainda falta historico dedicado de compras de reserva.
+- Controle de estoque: ja existe fluxo de uso, reposicao e historico do reserva. Ainda falta relatorio financeiro especifico do estoque.
 - Autenticacao: existe login funcional, mas senha ainda fica no payload do usuario. Para producao real, falta hash de senha e sessao/token no backend.
 - Admin: mostra consolidado geral, mas ainda nao tem filtros por regiao, periodo ou exportacao.
 - Alertas: notificacao local existe, mas falta lembrete recorrente e preferencia configuravel de dias/horario.
@@ -35,7 +36,7 @@
 
 ## Pendente recomendado
 
-- Criar historico dedicado de compras/reposicoes de reserva.
+- Criar relatorio financeiro especifico para estoque/reserva.
 - Criar endpoint de autenticacao real no backend.
 - Gravar usuarios em tabelas normalizadas no MySQL futuramente, em vez de payload JSON unico.
 - Adicionar migracoes versionadas do banco.

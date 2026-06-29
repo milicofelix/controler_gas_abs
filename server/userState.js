@@ -27,21 +27,29 @@ function createManualFields({ startedAt, endedAt, paidValue = '', notes = '' }) 
   }
 }
 
-function createDefaultGasState(today = formatDateInput()) {
+function createDefaultGasState(today = formatDateInput(), hasActiveCylinder = true) {
+  const startedAt = hasActiveCylinder ? today : ''
+
   return {
-    startedAt: today,
+    hasActiveCylinder,
+    startedAt,
     cycleDays: DEFAULT_CYCLE_DAYS,
     history: [],
-    manual: createManualFields({ startedAt: today, endedAt: today }),
+    manual: createManualFields({ startedAt, endedAt: today }),
     lastFinishedCycle: null,
     reminder: { enabled: false, scheduledFor: '' },
     currentBrand: normalizeBrand(DEFAULT_GAS_BRAND),
-    inventory: { reserveAvailable: false, reserveBrand: null, reservePurchasedAt: '', reservePaidValue: '' },
+    inventory: { reserveAvailable: false, reserveBrand: null, reservePurchasedAt: '', reservePaidValue: '', reserveId: '' },
+    reserveHistory: [],
   }
 }
 
 function normalizeGasState(nextState, today = formatDateInput()) {
-  const restoredStartedAt = nextState?.startedAt || today
+  const hasSavedState = nextState && typeof nextState === 'object'
+  const hasActiveCylinder = hasSavedState
+    ? (typeof nextState.hasActiveCylinder === 'boolean' ? nextState.hasActiveCylinder : Boolean(nextState.startedAt))
+    : false
+  const restoredStartedAt = hasActiveCylinder ? (nextState?.startedAt || today) : ''
   const restoredManual = nextState?.manual
     ? {
         installedAt: nextState.manual.installedAt || restoredStartedAt,
@@ -52,7 +60,8 @@ function normalizeGasState(nextState, today = formatDateInput()) {
     : createManualFields({ startedAt: restoredStartedAt, endedAt: today })
 
   return {
-    startedAt: restoredManual.installedAt || restoredStartedAt,
+    hasActiveCylinder,
+    startedAt: hasActiveCylinder ? (restoredManual.installedAt || restoredStartedAt) : restoredStartedAt,
     cycleDays: DEFAULT_CYCLE_DAYS,
     history: Array.isArray(nextState?.history) ? nextState.history : [],
     manual: restoredManual,
@@ -64,7 +73,9 @@ function normalizeGasState(nextState, today = formatDateInput()) {
       reserveBrand: nextState?.inventory?.reserveBrand ? normalizeBrand(nextState.inventory.reserveBrand) : null,
       reservePurchasedAt: nextState?.inventory?.reservePurchasedAt || '',
       reservePaidValue: nextState?.inventory?.reservePaidValue || '',
+      reserveId: nextState?.inventory?.reserveId || '',
     },
+    reserveHistory: Array.isArray(nextState?.reserveHistory) ? nextState.reserveHistory : [],
   }
 }
 
