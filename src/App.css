@@ -1887,7 +1887,7 @@ button.ghost,
 
   .actions {
     grid-column: 1 / -1;
-    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-columns: 2fr 1fr;
   }
 }
 
@@ -1969,40 +1969,6 @@ button.ghost,
   margin: 5px 0 0;
   color: rgba(226, 232, 240, 0.86);
   line-height: 1.45;
-}
-
-.secure-badge {
-  justify-self: end;
-  display: inline-grid;
-  grid-template-columns: 34px 1fr;
-  gap: 10px;
-  align-items: center;
-  border-radius: 14px;
-  padding: 12px 16px;
-  color: #0f2a55;
-  background: #fff;
-  outline: 1px solid rgba(148, 163, 184, 0.28);
-}
-
-.secure-badge > span {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
-  color: #fff;
-  background: #22c55e;
-  font-weight: 900;
-}
-
-.secure-badge strong,
-.secure-badge small {
-  display: block;
-}
-
-.secure-badge small {
-  margin-top: 2px;
-  color: #526a91;
 }
 
 .auth-title h1 {
@@ -2151,10 +2117,6 @@ button.ghost,
     height: 190px;
   }
 
-  .secure-badge {
-    justify-self: stretch;
-  }
-
   .demo-access-actions {
     grid-template-columns: 1fr;
   }
@@ -2169,6 +2131,7 @@ button.ghost,
   }
 
   .user-shell .brand-row {
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 8px;
   }
 
@@ -2182,7 +2145,26 @@ button.ghost,
     font-size: 20px;
   }
 
+  .header-identity span {
+    font-size: 12px;
+  }
+
+  .header-identity small {
+    font-size: 11px;
+  }
+
+  .header-session {
+    display: none;
+  }
+
+  .user-shell .hero-actions {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
   .user-shell .logout-button {
+    justify-self: start;
+    width: auto;
     min-height: 34px;
     padding: 0 9px;
     font-size: 11px;
@@ -2588,6 +2570,8 @@ button.ghost,
 
 .user-shell .hero-card {
   position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   min-height: 96px;
   padding: 16px 20px;
@@ -2624,17 +2608,104 @@ button.ghost,
   font-size: 23px;
   font-weight: 900;
   color: var(--primary-end);
+  white-space: nowrap;
 }
 
-.user-shell .hero-copy p,
-.user-shell .brand-row .eyebrow {
+.header-identity {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.header-identity span,
+.header-identity small {
+  color: var(--text-soft);
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.header-identity span {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.header-identity small {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.user-shell .hero-copy {
+  min-width: 0;
+}
+
+.user-shell .brand-row {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr);
+  align-items: center;
+  min-width: 0;
+  gap: 18px;
+}
+
+.user-shell .hero-copy p {
   display: none;
 }
 
 .user-shell .hero-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(180px, auto) auto;
   align-items: center;
-  gap: 10px;
+  justify-content: end;
+  gap: 16px;
+  min-width: 0;
+}
+
+.header-session {
+  display: grid;
+  max-width: none;
+  justify-items: end;
+  text-align: right;
+}
+
+.header-session strong,
+.header-session span {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-session strong {
+  color: var(--text-strong);
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+.header-session span {
+  margin-top: 3px;
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+@media (max-width: 760px) {
+  .user-shell .hero-card {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+
+  .user-shell .hero-actions {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
+    justify-content: stretch;
+  }
+
+  .header-session {
+    justify-items: start;
+    text-align: left;
+  }
 }
 
 .user-shell .status-pill {
@@ -3044,14 +3115,7 @@ button.ghost,
 }
 
 :root[data-theme='green-clean'] .hero-card {
-  justify-content: center;
   border-bottom: 0;
-}
-
-:root[data-theme='green-clean'] .hero-actions {
-  position: absolute;
-  right: 18px;
-  top: 18px;
 }
 
 :root[data-theme='green-clean'] .dashboard-card {
@@ -3274,5 +3338,19 @@ button.ghost,
 @media (max-width: 380px) {
   .quick-actions-card {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 430px) {
+  .header-identity,
+  .header-identity span,
+  .header-identity small {
+    min-width: 0;
+  }
+
+  .header-identity span,
+  .header-identity small {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }

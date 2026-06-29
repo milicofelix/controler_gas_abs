@@ -314,14 +314,6 @@ function LoginScreen({ users, onLogin, onCreateUser }) {
       </section>
 
       <section className="form-card auth-card">
-        <div className="secure-badge">
-          <span aria-hidden="true">✓</span>
-          <div>
-            <strong>Acesso seguro</strong>
-            <small>Dados sincronizados no seu banco</small>
-          </div>
-        </div>
-
         <div className="auth-title">
           <h1>{mode === 'login' ? 'Bem-vindo de volta!' : 'Cadastre sua casa'}</h1>
           <p>{mode === 'login' ? 'Faça login para acessar sua conta.' : 'Crie o acesso para acompanhar seu botijão.'}</p>
@@ -986,18 +978,6 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
     void cancelGasReminder()
   }
 
-  function startNewCylinder() {
-    setState((current) => ({
-      ...current,
-      hasActiveCylinder: true,
-      startedAt: today,
-      manual: createManualFields({ startedAt: today, endedAt: today }),
-      reminder: { enabled: false, scheduledFor: '' },
-    }))
-
-    void cancelGasReminder()
-  }
-
   function requestResetDemo() {
     setResetConfirmationOpen(true)
   }
@@ -1139,17 +1119,19 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
             >
               <AppLogo className="header-logo" />
             </button>
-            <span className="eyebrow">{currentUser.homeName}</span>
+            <div className="header-identity">
+              <h1>Meu Gás</h1>
+              <span>{currentUser.homeName}</span>
+              <small>Logado como {currentUser.name}</small>
+            </div>
           </div>
-          <h1>Meu Gás</h1>
-          <p>
-            {intelligence.isUsingRealAverage
-              ? `Previsão inteligente baseada na média móvel dos últimos ${intelligence.sampleSize} ciclos.`
-              : `Estimativa inicial baseada em ${DEFAULT_CYCLE_DAYS} dias de consumo.`}
-          </p>
         </div>
 
         <div className="hero-actions">
+          <div className="header-session">
+            <strong>{currentUser.name}</strong>
+            <span>{currentUser.email}</span>
+          </div>
           <div className={`status-pill ${stats.status.tone}`}>{stats.status.label}</div>
           <button type="button" className="logout-button" onClick={onLogout}>Encerrar sessão</button>
         </div>
@@ -1226,11 +1208,13 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
         </div>
       </section>
 
-      <section className="quick-actions-card">
-        <button type="button" className="primary register-main-button" onClick={() => setActivePage('history')}>
-          {hasActiveCylinder ? 'Registrar novo botijão' : 'Iniciar controle'}
-        </button>
-      </section>
+      {!hasActiveCylinder && (
+        <section className="quick-actions-card">
+          <button type="button" className="primary register-main-button" onClick={() => setActivePage('history')}>
+            Iniciar controle do botijão
+          </button>
+        </section>
+      )}
 
       <section className="home-secondary-grid">
         <article className="brand-dashboard-card">
@@ -1681,7 +1665,6 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
           <button type="button" className="primary" onClick={registerCylinderChange}>
             {hasActiveCylinder ? 'Registrar botijão acabou' : 'Iniciar controle'}
           </button>
-          <button type="button" onClick={startNewCylinder}>Iniciar botijão hoje</button>
           <button type="button" className="ghost" onClick={requestResetDemo}>Resetar</button>
         </div>
 
