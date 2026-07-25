@@ -74,6 +74,7 @@ function normalizeResidenceProfile(user, today) {
   return {
     city: user.city || user.residenceProfile?.city || '',
     state: user.stateCode || user.residenceProfile?.state || '',
+    whatsapp: user.whatsapp || user.phone || user.residenceProfile?.whatsapp || '',
     avatar: user.avatar || user.residenceProfile?.avatar || '',
     updatedAt: user.residenceProfile?.updatedAt || today,
   }
@@ -117,6 +118,7 @@ export function createSeedUsers(today) {
       residenceProfile: {
         city: 'São Paulo',
         state: 'SP',
+        whatsapp: '',
         avatar: '',
         updatedAt: today,
       },
@@ -228,6 +230,7 @@ export function createUser({ name, homeName, email, password }) {
     residenceProfile: {
       city: '',
       state: '',
+      whatsapp: '',
       avatar: '',
       updatedAt: today,
     },
