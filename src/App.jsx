@@ -529,6 +529,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
   const [resetConfirmationOpen, setResetConfirmationOpen] = useState(false)
   const [reserveReason, setReserveReason] = useState('acabou')
   const [reserveReasonNotes, setReserveReasonNotes] = useState('')
+  const [reserveSwitchDate, setReserveSwitchDate] = useState(formatDateInput(new Date()))
   const [reserveForm, setReserveForm] = useState(() => ({
     brandId: currentUser.state?.inventory?.reserveBrand?.id || currentUser.state?.currentBrand?.id || DEFAULT_GAS_BRAND.id,
     purchasedAt: currentUser.state?.inventory?.reservePurchasedAt || formatDateInput(new Date()),
@@ -853,33 +854,31 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
   }
 
   function requestUseReserveCylinder() {
-    if (stats.percent <= 10) {
-      applyReserveCylinder('Gás em nível crítico.')
-      return
-    }
-
+    setReserveSwitchDate(state.manual?.endedAt || today)
     setReserveConfirmationOpen(true)
   }
 
   function confirmUseReserveCylinder(event) {
     event.preventDefault()
     const reasonText = getReserveReasonText(reserveReason, reserveReasonNotes)
+    const switchedAt = reserveSwitchDate || today
 
-    applyReserveCylinder(reasonText)
+    applyReserveCylinder(reasonText, switchedAt)
     setReserveConfirmationOpen(false)
     setReserveReason('acabou')
     setReserveReasonNotes('')
+    setReserveSwitchDate(today)
   }
 
-  function applyReserveCylinder(reasonText) {
+  function applyReserveCylinder(reasonText, switchedAt = today) {
     const reserveBrand = state.inventory?.reserveBrand
       ? normalizeBrand(state.inventory.reserveBrand)
       : currentBrand
     const lastFinishedCycle = hasActiveCylinder
       ? createHistoryEntry({
           installedAt: state.startedAt,
-          endedAt: today,
-          duration: Math.max(1, daysBetween(state.startedAt, today)),
+          endedAt: switchedAt,
+          duration: Math.max(1, daysBetween(state.startedAt, switchedAt)),
           paidValue: state.manual?.paidValue || '',
           notes: [state.manual?.notes, `Troca pelo botijão reserva. Motivo: ${reasonText}`].filter(Boolean).join(' '),
           brand: currentBrand,
@@ -890,7 +889,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
     setState((current) => ({
       ...current,
       hasActiveCylinder: true,
-      startedAt: today,
+      startedAt: switchedAt,
       history: nextHistory,
       lastFinishedCycle,
       currentBrand: reserveBrand,
@@ -902,12 +901,12 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
         reserveId: '',
       },
       reserveHistory: updateReserveHistoryStatus(current.reserveHistory, state.inventory?.reserveId, 'used', {
-        usedAt: today,
+        usedAt: switchedAt,
         notes: `Usado como botijão principal. Motivo: ${reasonText}`,
       }),
       manual: createManualFields({
-        startedAt: today,
-        endedAt: today,
+        startedAt: switchedAt,
+        endedAt: switchedAt,
         paidValue: state.inventory?.reservePaidValue || '',
         notes: state.inventory?.reservePurchasedAt
           ? `Botijão reserva comprado em ${formatDisplayDate(state.inventory.reservePurchasedAt)}.`
@@ -1210,7 +1209,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
 
       {!hasActiveCylinder && (
         <section className="quick-actions-card">
-          <button type="button" className="primary register-main-button" onClick={() => setActivePage('history')}>
+          <button type="button" className="primary register-main-button" onClick={() => setActivePage('stock')}>
             Iniciar controle do botijão
           </button>
         </section>
@@ -1312,6 +1311,139 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
             )}
           </div>
         </article>
+
+        <section className="form-card">
+          <div className="form-header">
+            <span className="eyebrow">Operação</span>
+            <h2>{hasActiveCylinder ? 'Encerrar ciclo atual' : 'Iniciar botijão'}</h2>
+          </div>
+
+          <label>
+            Data da instalação
+            <input
+              type="date"
+              value={state.manual?.installedAt || state.startedAt || ''}
+              max={today}
+              disabled={hasActiveCylinder}
+              onChange={updateStartedAt}
+              onInput={updateStartedAt}
+            />
+            <small className="field-hint">
+              {hasActiveCylinder
+                ? 'Esta é a data em que o botijão atual entrou em uso e fica travada para manter o cálculo correto.'
+                : 'Informe quando este botijão foi instalado. Depois de iniciar, esta data fica fixa.'}
+            </small>
+          </label>
+
+          {hasActiveCylinder && (
+            <label>
+              Data em que acabou
+              <input
+                type="date"
+                value={state.manual?.endedAt || state.startedAt || today}
+                min={state.startedAt || undefined}
+                max={today}
+                onChange={(event) => updateManualField('endedAt', event.target.value || today)}
+                onInput={(event) => updateManualField('endedAt', event.target.value || today)}
+              />
+              <small className="field-hint">
+                Use este campo somente quando for registrar o fim deste botijão.
+              </small>
+            </label>
+          )}
+
+          <label>
+            Valor pago
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="Opcional"
+              value={formatMoney(state.manual?.paidValue)}
+              onChange={(event) => updateManualField('paidValue', event.target.value)}
+            />
+          </label>
+
+          <label className="notes-field">
+            Observações
+            <textarea
+              rows="3"
+              placeholder="Opcional"
+              value={state.manual?.notes || ''}
+              onChange={(event) => updateManualField('notes', event.target.value)}
+              onInput={(event) => updateManualField('notes', event.target.value)}
+            />
+          </label>
+
+          <div className="brand-form-panel">
+            <div className="brand-form-header">
+              <div>
+                <span className="eyebrow">Marca do gás</span>
+                <strong>{currentBrand.name}</strong>
+              </div>
+              <BrandLogo brand={currentBrand} className="large" />
+            </div>
+
+            <label>
+              Marca atual
+              <select value={currentBrand.id} onChange={(event) => updateBrandFromSelect(event.target.value)}>
+                {GAS_BRANDS.map((brand) => (
+                  <option key={brand.id} value={brand.id}>{brand.name}</option>
+                ))}
+              </select>
+            </label>
+
+            {currentBrand.id === 'outra' && (
+              <label>
+                Nome da marca
+                <input
+                  value={currentBrand.name}
+                  placeholder="Ex.: Marca regional"
+                  onChange={(event) => updateCustomBrandName(event.target.value)}
+                />
+              </label>
+            )}
+
+            <div className="brand-upload-box">
+              <div>
+                <span className="eyebrow">Logo personalizado</span>
+                <strong>{currentBrand.logo ? 'Preview ativo' : 'Avatar padrão'}</strong>
+                <p>Formatos aceitos: JPG, PNG ou WEBP até 1 MB.</p>
+              </div>
+
+              <div className="brand-upload-actions">
+                <label className="file-action compact">
+                  Escolher logo
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadBrandLogo} />
+                </label>
+
+                {currentBrand.logo && (
+                  <button type="button" className="ghost compact-button" onClick={removeBrandLogo}>
+                    Remover logo
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {brandUploadStatus && (
+              <div className="brand-upload-status" role="status">
+                {brandUploadStatus}
+              </div>
+            )}
+          </div>
+
+          <div className="actions">
+            <button type="button" className="primary" onClick={registerCylinderChange}>
+              {hasActiveCylinder ? 'Registrar botijão acabou' : 'Iniciar controle'}
+            </button>
+            <button type="button" className="ghost" onClick={requestResetDemo}>Resetar</button>
+          </div>
+
+          {state.lastFinishedCycle && (
+            <div className="cycle-feedback" role="status">
+              Último ciclo fechado com {state.lastFinishedCycle.duration} dias.
+            </div>
+          )}
+        </section>
 
         <section className="reserve-purchase-card">
           <div>
@@ -1455,48 +1587,6 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
         </section>
       )}
 
-      {reserveConfirmationOpen && (
-        <section className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="reserve-confirm-title">
-          <form className="modal-card" onSubmit={confirmUseReserveCylinder}>
-            <div>
-              <span className="eyebrow">Confirmar troca</span>
-              <h2 id="reserve-confirm-title">Usar botijão reserva?</h2>
-              <p>O botijão atual ainda está com {stats.percent}% estimado. Informe o motivo para registrar a troca.</p>
-            </div>
-
-            <label>
-              Motivo
-              <select value={reserveReason} onChange={(event) => setReserveReason(event.target.value)}>
-                <option value="acabou">Acabou o gás</option>
-                <option value="vazamento">Suspeita de vazamento</option>
-                <option value="preventivo">Troca preventiva</option>
-                <option value="outro">Outro motivo</option>
-              </select>
-            </label>
-
-            {reserveReason === 'outro' && (
-              <label>
-                Observação
-                <textarea
-                  value={reserveReasonNotes}
-                  onChange={(event) => setReserveReasonNotes(event.target.value)}
-                  placeholder="Descreva o motivo da troca"
-                />
-              </label>
-            )}
-
-            <div className="modal-actions">
-              <button type="button" className="ghost" onClick={() => setReserveConfirmationOpen(false)}>
-                Cancelar
-              </button>
-              <button type="submit" className="primary">
-                Confirmar troca
-              </button>
-            </div>
-          </form>
-        </section>
-      )}
-
       <section className={`intelligence-card ${intelligence.pattern.tone}`}>
         <div className="intelligence-header">
           <div>
@@ -1542,176 +1632,49 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
 
       {activePage === 'history' && (
         <>
-      <section className="form-card">
-        <div className="form-header">
-          <span className="eyebrow">Controle manual</span>
-          <h2>{hasActiveCylinder ? 'Encerrar ciclo atual' : 'Iniciar botijão'}</h2>
-        </div>
-
-        <label>
-          Data da instalação
-          <input
-            type="date"
-            value={state.manual?.installedAt || state.startedAt || ''}
-            max={today}
-            disabled={hasActiveCylinder}
-            onChange={updateStartedAt}
-            onInput={updateStartedAt}
-          />
-          <small className="field-hint">
-            {hasActiveCylinder
-              ? 'Esta é a data em que o botijão atual entrou em uso e fica travada para manter o cálculo correto.'
-              : 'Informe quando este botijão foi instalado. Depois de iniciar, esta data fica fixa.'}
-          </small>
-        </label>
-
-        {hasActiveCylinder && (
-          <label>
-            Data em que acabou
-            <input
-              type="date"
-              value={state.manual?.endedAt || state.startedAt || today}
-              min={state.startedAt || undefined}
-              max={today}
-              onChange={(event) => updateManualField('endedAt', event.target.value || today)}
-              onInput={(event) => updateManualField('endedAt', event.target.value || today)}
-            />
-            <small className="field-hint">
-              Use este campo somente quando for registrar o fim deste botijão.
-            </small>
-          </label>
-        )}
-
-        <label>
-          Valor pago
-          <input
-            type="text"
-            inputMode="numeric"
-            placeholder="Opcional"
-            value={formatMoney(state.manual?.paidValue)}
-            onChange={(event) => updateManualField('paidValue', event.target.value)}
-          />
-        </label>
-
-        <label className="notes-field">
-          Observações
-          <textarea
-            rows="3"
-            placeholder="Opcional"
-            value={state.manual?.notes || ''}
-            onChange={(event) => updateManualField('notes', event.target.value)}
-            onInput={(event) => updateManualField('notes', event.target.value)}
-          />
-        </label>
-
-        <div className="brand-form-panel">
-          <div className="brand-form-header">
-            <div>
-              <span className="eyebrow">Marca do gás</span>
-              <strong>{currentBrand.name}</strong>
-            </div>
-            <BrandLogo brand={currentBrand} className="large" />
-          </div>
-
-          <label>
-            Marca atual
-            <select value={currentBrand.id} onChange={(event) => updateBrandFromSelect(event.target.value)}>
-              {GAS_BRANDS.map((brand) => (
-                <option key={brand.id} value={brand.id}>{brand.name}</option>
-              ))}
-            </select>
-          </label>
-
-          {currentBrand.id === 'outra' && (
-            <label>
-              Nome da marca
-              <input
-                value={currentBrand.name}
-                placeholder="Ex.: Marca regional"
-                onChange={(event) => updateCustomBrandName(event.target.value)}
-              />
-            </label>
-          )}
-
-          <div className="brand-upload-box">
-            <div>
-              <span className="eyebrow">Logo personalizado</span>
-              <strong>{currentBrand.logo ? 'Preview ativo' : 'Avatar padrão'}</strong>
-              <p>Formatos aceitos: JPG, PNG ou WEBP até 1 MB.</p>
-            </div>
-
-            <div className="brand-upload-actions">
-              <label className="file-action compact">
-                Escolher logo
-                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadBrandLogo} />
-              </label>
-
-              {currentBrand.logo && (
-                <button type="button" className="ghost compact-button" onClick={removeBrandLogo}>
-                  Remover logo
-                </button>
-              )}
-            </div>
-          </div>
-
-          {brandUploadStatus && (
-            <div className="brand-upload-status" role="status">
-              {brandUploadStatus}
-            </div>
-          )}
-        </div>
-
-        <div className="actions">
-          <button type="button" className="primary" onClick={registerCylinderChange}>
-            {hasActiveCylinder ? 'Registrar botijão acabou' : 'Iniciar controle'}
-          </button>
-          <button type="button" className="ghost" onClick={requestResetDemo}>Resetar</button>
-        </div>
-
-        {state.lastFinishedCycle && (
-          <div className="cycle-feedback" role="status">
-            Último ciclo fechado com {state.lastFinishedCycle.duration} dias.
-          </div>
-        )}
-      </section>
-
-      {state.history.length > 0 && (
         <section className="history-card">
           <div className="history-header">
             <div>
               <span className="eyebrow">Histórico</span>
               <h2>Últimas trocas</h2>
             </div>
-            <div className="history-average">
-              <span>Média real</span>
-              <strong>{historyStats.averageDuration} dias</strong>
-            </div>
+            {state.history.length > 0 && (
+              <div className="history-average">
+                <span>Média real</span>
+                <strong>{historyStats.averageDuration} dias</strong>
+              </div>
+            )}
           </div>
 
-          <div className="history-list">
-            {state.history.map((cycle) => (
-              <article key={cycle.id} className="history-item">
-                <div>
-                  <strong>{cycle.duration} dias</strong>
-                  <span>{formatDisplayDate(cycle.installedAt)} até {formatDisplayDate(cycle.endedAt)}</span>
-                </div>
-
-                <div className="history-brand">
-                  <BrandLogo brand={{ name: cycle.brandName, logo: cycle.brandLogo }} />
-                  <span>{cycle.brandName || 'Marca não informada'}</span>
-                </div>
-
-                {(cycle.paidValue || cycle.notes) && (
-                  <div className="history-meta">
-                    {cycle.paidValue && <span>{formatMoney(cycle.paidValue)}</span>}
-                    {cycle.notes && <p>{cycle.notes}</p>}
+          {state.history.length > 0 ? (
+            <div className="history-list">
+              {state.history.map((cycle) => (
+                <article key={cycle.id} className="history-item">
+                  <div>
+                    <strong>{cycle.duration} dias</strong>
+                    <span>{formatDisplayDate(cycle.installedAt)} até {formatDisplayDate(cycle.endedAt)}</span>
                   </div>
-                )}
-              </article>
-            ))}
-          </div>
+
+                  <div className="history-brand">
+                    <BrandLogo brand={{ name: cycle.brandName, logo: cycle.brandLogo }} />
+                    <span>{cycle.brandName || 'Marca não informada'}</span>
+                  </div>
+
+                  {(cycle.paidValue || cycle.notes) && (
+                    <div className="history-meta">
+                      {cycle.paidValue && <span>{formatMoney(cycle.paidValue)}</span>}
+                      {cycle.notes && <p>{cycle.notes}</p>}
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">
+              Nenhuma troca registrada ainda. Para iniciar ou encerrar um botijão, use a tela Estoque.
+            </div>
+          )}
         </section>
-      )}
         </>
       )}
 
@@ -2020,6 +1983,63 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
           </div>
         )}
       </section>
+      )}
+
+      {reserveConfirmationOpen && (
+        <section className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="reserve-confirm-title">
+          <form className="modal-card" onSubmit={confirmUseReserveCylinder}>
+            <div>
+              <span className="eyebrow">Confirmar troca</span>
+              <h2 id="reserve-confirm-title">Usar botijão reserva?</h2>
+              <p>
+                Informe a data real em que a troca aconteceu. Isso evita que o histórico,
+                a média e a previsão usem a data de hoje quando você registrou atrasado.
+              </p>
+            </div>
+
+            <label>
+              Data da troca
+              <input
+                type="date"
+                value={reserveSwitchDate}
+                min={hasActiveCylinder ? state.startedAt : undefined}
+                max={today}
+                onChange={(event) => setReserveSwitchDate(event.target.value || today)}
+                onInput={(event) => setReserveSwitchDate(event.target.value || today)}
+              />
+            </label>
+
+            <label>
+              Motivo
+              <select value={reserveReason} onChange={(event) => setReserveReason(event.target.value)}>
+                <option value="acabou">Acabou o gás</option>
+                <option value="vazamento">Suspeita de vazamento</option>
+                <option value="preventivo">Troca preventiva</option>
+                <option value="outro">Outro motivo</option>
+              </select>
+            </label>
+
+            {reserveReason === 'outro' && (
+              <label>
+                Observação
+                <textarea
+                  value={reserveReasonNotes}
+                  onChange={(event) => setReserveReasonNotes(event.target.value)}
+                  placeholder="Descreva o motivo da troca"
+                />
+              </label>
+            )}
+
+            <div className="modal-actions">
+              <button type="button" className="ghost" onClick={() => setReserveConfirmationOpen(false)}>
+                Cancelar
+              </button>
+              <button type="submit" className="primary">
+                Confirmar troca
+              </button>
+            </div>
+          </form>
+        </section>
       )}
 
       {resetConfirmationOpen && (
