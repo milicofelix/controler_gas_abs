@@ -47,6 +47,11 @@ import {
   formatWhatsAppDisplay,
   normalizeWhatsAppPhone,
 } from './whatsappStatus'
+import {
+  createReserveHistoryEntry,
+  getReserveStatusLabel,
+  updateReserveHistoryStatus,
+} from './reserveHistory'
 import './App.css'
 
 
@@ -787,45 +792,6 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
     }))
   }
 
-  function createReserveHistoryEntry({ brand, purchasedAt, paidValue = '', status = 'available', usedAt = '', notes = '' }) {
-    const uniqueSuffix = typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-    const normalizedBrand = normalizeBrand(brand)
-
-    return {
-      id: `${purchasedAt}-${normalizedBrand.id}-${uniqueSuffix}`,
-      brandId: normalizedBrand.id,
-      brandName: normalizedBrand.name,
-      brandLogo: normalizedBrand.logo,
-      purchasedAt,
-      paidValue,
-      status,
-      usedAt,
-      notes,
-      createdAt: today,
-    }
-  }
-
-  function updateReserveHistoryStatus(history = [], reserveId, status, extras = {}) {
-    if (!reserveId) return history
-
-    return history.map((entry) => (
-      entry.id === reserveId ? { ...entry, status, ...extras } : entry
-    ))
-  }
-
-  function getReserveStatusLabel(status) {
-    const statusLabels = {
-      available: 'Disponível',
-      used: 'Usado',
-      removed: 'Removido',
-      replaced: 'Substituído',
-    }
-
-    return statusLabels[status] || 'Registrado'
-  }
-
   function registerReservePurchase(event) {
     event.preventDefault()
     const reserveBrand = GAS_BRANDS.find((brand) => brand.id === reserveForm.brandId) || DEFAULT_GAS_BRAND
@@ -834,6 +800,7 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
       brand: reserveBrand,
       purchasedAt,
       paidValue: reserveForm.paidValue || '',
+      today,
     })
 
     setState((current) => ({
