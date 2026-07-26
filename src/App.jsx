@@ -50,6 +50,7 @@ import {
   getReserveStatusLabel,
   updateReserveHistoryStatus,
 } from './reserveHistory'
+import { readImageFile } from './imageUpload'
 import './App.css'
 
 
@@ -137,24 +138,6 @@ function ProfileAvatar({ user }) {
   }
 
   return <span className="profile-avatar fallback" aria-hidden="true">{getBrandInitials(user.name)}</span>
-}
-
-function readImageFile(file, onSuccess, onError) {
-  if (!file || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-    onError('Use uma imagem JPG, PNG ou WEBP.')
-    return
-  }
-
-  if (file.size > 1024 * 1024) {
-    onError('Use uma imagem de até 1 MB.')
-    return
-  }
-
-  const reader = new FileReader()
-
-  reader.onload = () => onSuccess(String(reader.result || ''))
-  reader.onerror = () => onError('Não foi possível carregar a imagem.')
-  reader.readAsDataURL(file)
 }
 
 function CylinderGauge({ percent, tone }) {
