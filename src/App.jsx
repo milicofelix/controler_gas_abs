@@ -5,17 +5,14 @@ import {
   DEFAULT_GAS_BRAND,
   GAS_REMINDER_NOTIFICATION_ID,
   GAS_BRANDS,
-  MOVING_AVERAGE_LIMIT,
   averageDuration,
   calculateBrandStats,
   calculateConsumptionStats,
   calculateFinancialStats,
-  calculateStats,
   calculateTrendStats,
   createHistoryEntry,
   createManualFields,
   daysBetween,
-  detectConsumptionPattern,
   formatDateInput,
   formatDisplayDate,
   formatMoney,
@@ -41,6 +38,7 @@ import {
   saveRemoteUsers,
   saveUsers,
 } from './authStorage'
+import { buildIntelligence, getUserStats } from './userStats'
 import {
   buildGasStatusWhatsAppMessage,
   buildWhatsAppUrl,
@@ -100,43 +98,6 @@ async function cancelGasReminder() {
   } catch {
     // O cancelamento pode falhar no navegador; o app segue funcionando.
   }
-}
-
-function buildIntelligence(history) {
-  const recentCycles = history.slice(0, MOVING_AVERAGE_LIMIT)
-  const movingAverage = averageDuration(recentCycles)
-  const projectedCycleDays = movingAverage || DEFAULT_CYCLE_DAYS
-
-  return {
-    projectedCycleDays,
-    movingAverage,
-    isUsingRealAverage: movingAverage > 0,
-    sampleSize: recentCycles.length,
-    pattern: detectConsumptionPattern(history, movingAverage),
-  }
-}
-
-function getUserStats(user, today = formatDateInput(new Date())) {
-  const state = normalizeGasState(user.state, today)
-  const hasActiveCylinder = Boolean(state.hasActiveCylinder && state.startedAt)
-  const intelligence = buildIntelligence(state.history)
-  const stats = hasActiveCylinder
-    ? calculateStats({
-        startedAt: state.startedAt,
-        today,
-        projectedCycleDays: intelligence.projectedCycleDays,
-      })
-    : {
-        elapsedDays: 0,
-        percent: 0,
-        remainingDays: 0,
-        buyInDays: 0,
-        status: { label: 'Sem botijão', tone: 'empty' },
-        expectedEnd: '',
-        recommendation: 'Cadastre um botijão',
-      }
-
-  return { state, intelligence, stats }
 }
 
 function getBrandInitials(name) {
@@ -589,22 +550,8 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
   const intelligence = useMemo(() => buildIntelligence(state.history), [state.history])
 
   const stats = useMemo(() => (
-    hasActiveCylinder
-      ? calculateStats({
-          startedAt: state.startedAt,
-          today,
-          projectedCycleDays: intelligence.projectedCycleDays,
-        })
-      : {
-          elapsedDays: 0,
-          percent: 0,
-          remainingDays: 0,
-          buyInDays: 0,
-          status: { label: 'Sem botijão', tone: 'empty' },
-          expectedEnd: '',
-          recommendation: 'Cadastre um botijão',
-        }
-  ), [hasActiveCylinder, state.startedAt, intelligence.projectedCycleDays, today])
+    getUserStats({ state }, today).stats
+  ), [state, today])
 
   const visualAlert = hasActiveCylinder ? getAlert(stats.percent) : null
   const smartAlerts = useMemo(() => (

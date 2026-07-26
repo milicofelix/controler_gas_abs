@@ -6,7 +6,7 @@ import {
   formatDateInput,
   normalizeBrand,
   normalizeHistory,
-} from './gasMath'
+} from './gasMath.js'
 
 export const AUTH_SESSION_KEY = 'gas-control-session-v1'
 export const AUTH_USERS_KEY = 'gas-control-users-v1'
@@ -16,7 +16,7 @@ export const SUPER_ADMIN_PASSWORD = 'admin123'
 export const DEMO_USER_EMAIL = 'casa@gas.local'
 export const DEMO_USER_PASSWORD = 'casa123'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || ''
+const API_BASE_URL = import.meta.env?.VITE_API_URL || ''
 
 export function createDefaultGasState(today = formatDateInput(new Date()), hasActiveCylinder = true) {
   const startedAt = hasActiveCylinder ? today : ''
