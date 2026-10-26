@@ -3898,6 +3898,197 @@ button.ghost,
   padding-bottom: 8px;
 }
 
+/* PWA Fase 6 — perfil, configurações e backup */
+.profile-settings {
+  display: grid;
+  gap: 14px;
+  padding-bottom: 8px;
+}
+
+.settings-group {
+  border: 1px solid var(--card-border);
+  border-radius: 22px;
+  padding: 18px;
+  background: var(--card-bg);
+  box-shadow: var(--card-shadow);
+}
+
+.settings-group-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.settings-group-heading h2 {
+  margin: 5px 0 0;
+  color: var(--text-strong);
+  font-size: 21px;
+}
+
+.settings-group-heading > small {
+  max-width: 45%;
+  color: var(--text-soft);
+  font-size: 10px;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.profile-settings .profile-form {
+  display: grid;
+  gap: 14px;
+}
+
+.profile-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.profile-fields-grid label {
+  display: grid;
+  gap: 7px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.profile-settings .profile-form > button {
+  width: auto;
+  min-width: 180px;
+  justify-self: start;
+}
+
+.settings-help {
+  margin: 12px 0 0;
+  color: var(--text-soft);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.settings-facts,
+.application-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.settings-facts article,
+.application-facts article {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 12px;
+  background: var(--surface-deep);
+}
+
+.settings-facts span,
+.application-facts span {
+  color: var(--text-soft);
+  font-size: 10px;
+}
+
+.settings-facts strong,
+.application-facts strong {
+  color: var(--text-strong);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.settings-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.settings-action-grid button,
+.settings-action-grid .file-action {
+  display: grid;
+  place-items: center;
+  min-height: 48px;
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.install-instructions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  border: 1px solid color-mix(in srgb, var(--primary-end) 25%, var(--card-border));
+  border-radius: 18px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--surface-deep) 85%, var(--primary-start) 15%);
+}
+
+.install-instructions strong {
+  color: var(--text-strong);
+  font-size: 13px;
+}
+
+.install-instructions p {
+  margin: 4px 0 0;
+  color: var(--text-soft);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.install-instructions button {
+  width: auto;
+  min-width: 150px;
+  min-height: 46px;
+}
+
+.import-warning {
+  margin-top: 12px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 14px;
+  padding: 11px;
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.12);
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+
+@media (max-width: 620px) {
+  .profile-fields-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .install-instructions {
+    display: grid;
+  }
+
+  .install-instructions button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .settings-group-heading {
+    display: grid;
+  }
+
+  .settings-group-heading > small {
+    max-width: none;
+    text-align: left;
+  }
+
+  .settings-facts,
+  .application-facts,
+  .settings-action-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .analytics-header-card,
 .analytics-section,
 .analytics-trend-card,

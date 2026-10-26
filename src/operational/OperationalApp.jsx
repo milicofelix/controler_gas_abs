@@ -13,7 +13,7 @@ import {
 } from '../gasMath.js'
 import { normalizeGasState } from '../authStorage.js'
 import { buildIntelligence, getUserStats } from '../userStats.js'
-import { formatWhatsAppDisplay, normalizeWhatsAppPhone } from '../whatsappStatus.js'
+import { normalizeWhatsAppPhone } from '../whatsappStatus.js'
 import {
   createReserveHistoryEntry,
   updateReserveHistoryStatus,
@@ -23,7 +23,6 @@ import { readImageFile } from '../imageUpload.js'
 import { PAGE_OPTIONS, THEME_OPTIONS, getThemeOption } from '../appOptions.js'
 import {
   AppLogo,
-  ProfileAvatar,
   cancelGasReminder,
 } from '../components/GasVisuals.jsx'
 import OperationalShell from './components/OperationalShell.jsx'
@@ -32,13 +31,14 @@ import CylinderOperationsFeature from './features/cylinders/CylinderOperationsFe
 import HistoryTimelineFeature from './features/history/HistoryTimelineFeature.jsx'
 import AlertsCenterFeature from './features/alerts/AlertsCenterFeature.jsx'
 import AnalyticsFeature from './features/analytics/AnalyticsFeature.jsx'
+import ProfileSettingsFeature from './features/profile/ProfileSettingsFeature.jsx'
 import { useOperationalNavigation } from './hooks/useOperationalNavigation.js'
 
 function isRunningStandalone() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
 }
 
-export default function OperationalApp({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout, storageStatus }) {
+export default function OperationalApp({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout, storageStatus, lastSyncedAt, onRestoreUserFromServer, installPromptAvailable, onRequestInstall }) {
   const { activePage, navigate: setActivePage } = useOperationalNavigation(PAGE_OPTIONS)
   const [state, setState] = useState(() => normalizeGasState(currentUser.state))
   const [stockIntent, setStockIntent] = useState('')
@@ -273,60 +273,26 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
     return result
   }
 
-  function exportBackup() {
-    const payload = {
-      app: 'Controle Gás',
-      version: 2,
-      exportedAt: new Date().toISOString(),
-      user: {
-        name: currentUser.name,
-        homeName: currentUser.homeName,
-        email: currentUser.email,
-        theme: currentUser.theme,
-        residenceProfile: currentUser.residenceProfile,
-      },
-      data: state,
-    }
-    const backup = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(backup)
-    const link = document.createElement('a')
-
-    link.href = url
-    link.download = `controle-gas-${currentUser.homeName.replaceAll(' ', '-').toLowerCase()}-${today}.json`
-    link.click()
-    URL.revokeObjectURL(url)
-    setSettingsStatus('Backup exportado.')
-  }
-
-  function applyRestoredState(nextState) {
+  function applyImportedState(nextState) {
     setState(normalizeGasState(nextState, today))
   }
 
-  function importBackup(event) {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-
-    reader.onload = () => {
-      try {
-        const parsed = JSON.parse(reader.result)
-        const nextState = parsed.data || parsed
-
-        if (!nextState || typeof nextState !== 'object' || (!nextState.startedAt && typeof nextState.hasActiveCylinder !== 'boolean')) {
-          throw new Error('backup-invalido')
-        }
-
-        applyRestoredState(nextState)
-        setSettingsStatus('Backup importado.')
-      } catch {
-        setSettingsStatus('Não foi possível importar este arquivo.')
-      } finally {
-        event.target.value = ''
-      }
+  async function restoreFromServer() {
+    const result = await onRestoreUserFromServer(currentUser.id)
+    if (result.ok) {
+      setState(normalizeGasState(result.user.state, today))
+      setProfileForm({
+        name: result.user.name || '',
+        homeName: result.user.homeName || '',
+        email: result.user.email || '',
+        password: result.user.password || '',
+        city: result.user.residenceProfile?.city || '',
+        state: result.user.residenceProfile?.state || '',
+        whatsapp: result.user.residenceProfile?.whatsapp || '',
+        avatar: result.user.residenceProfile?.avatar || '',
+      })
     }
-
-    reader.readAsText(file)
+    return result
   }
 
   async function scheduleBuyReminder() {
@@ -519,166 +485,25 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
       )}
 
       {activePage === 'profile' && (
-      <section className="settings-card">
-        <div className="settings-header">
-          <div>
-            <span className="eyebrow">Configurações</span>
-            <h2>Editar cadastro</h2>
-          </div>
-        </div>
-
-        <div className="theme-panel">
-          <div className="theme-panel-header">
-            <div>
-              <span className="eyebrow">Tema atual</span>
-              <strong>{currentTheme.name}</strong>
-            </div>
-            <span>{currentTheme.description}</span>
-          </div>
-
-          <div className="theme-grid" role="radiogroup" aria-label="Escolha do tema visual">
-            {THEME_OPTIONS.map((theme) => (
-              <button
-                key={theme.id}
-                type="button"
-                className={`theme-option ${theme.id} ${currentUser.theme === theme.id ? 'active' : ''}`}
-                onClick={() => onUpdateUserTheme(currentUser.id, theme.id)}
-                aria-pressed={currentUser.theme === theme.id}
-              >
-                <span className="theme-preview" aria-hidden="true">
-                  <i></i>
-                  <b></b>
-                </span>
-                <strong>{theme.name}</strong>
-                <small>{theme.description}</small>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <form className="profile-form" onSubmit={saveProfile}>
-          <div className="profile-avatar-panel">
-            {profileForm.avatar
-              ? <img className="profile-avatar large" src={profileForm.avatar} alt={profileForm.name || 'Perfil'} />
-              : <ProfileAvatar user={{ ...currentUser, name: profileForm.name, residenceProfile: { avatar: '' } }} />}
-            <div>
-              <span className="eyebrow">Foto do perfil</span>
-              <strong>{profileForm.homeName || currentUser.homeName}</strong>
-              <label className="file-action compact">
-                Upload de foto
-                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadProfileAvatar} />
-              </label>
-            </div>
-          </div>
-
-          <label>
-            Nome do responsável
-            <input
-              value={profileForm.name}
-              onChange={(event) => updateProfileField('name', event.target.value)}
-              placeholder="Ex.: Adriano"
-            />
-          </label>
-
-          <label>
-            Nome da residência
-            <input
-              value={profileForm.homeName}
-              onChange={(event) => updateProfileField('homeName', event.target.value)}
-              placeholder="Ex.: Minha casa"
-            />
-          </label>
-
-          <label>
-            Cidade
-            <input
-              value={profileForm.city}
-              onChange={(event) => updateProfileField('city', event.target.value)}
-              placeholder="Ex.: São Paulo"
-            />
-          </label>
-
-          <label>
-            Estado
-            <input
-              value={profileForm.state}
-              maxLength="2"
-              onChange={(event) => updateProfileField('state', event.target.value.toUpperCase())}
-              placeholder="SP"
-            />
-          </label>
-
-          <label>
-            WhatsApp
-            <input
-              inputMode="tel"
-              value={formatWhatsAppDisplay(profileForm.whatsapp)}
-              onChange={(event) => updateProfileField('whatsapp', event.target.value)}
-              placeholder="(11) 99999-9999"
-            />
-          </label>
-
-          <label>
-            E-mail de acesso
-            <input
-              type="email"
-              value={profileForm.email}
-              onChange={(event) => updateProfileField('email', event.target.value)}
-            />
-          </label>
-
-          <label>
-            Senha
-            <input
-              type="password"
-              value={profileForm.password}
-              onChange={(event) => updateProfileField('password', event.target.value)}
-            />
-          </label>
-
-          <button type="submit" className="primary">Salvar cadastro</button>
-        </form>
-
-        <div className="settings-grid">
-          <article>
-            <span>Usuário</span>
-            <strong>{currentUser.name}</strong>
-          </article>
-          <article>
-            <span>Residência</span>
-            <strong>
-              {currentUser.homeName}
-              {currentUser.residenceProfile?.city && ` • ${currentUser.residenceProfile.city}`}
-              {currentUser.residenceProfile?.state && `/${currentUser.residenceProfile.state}`}
-            </strong>
-          </article>
-          <article>
-            <span>Ciclos salvos</span>
-            <strong>{historyStats.totalCycles}</strong>
-          </article>
-          <article>
-            <span>Tema</span>
-            <strong>{currentTheme.name}</strong>
-          </article>
-        </div>
-
-        <div className="settings-actions">
-          <button type="button" className="primary" onClick={exportBackup}>
-            Exportar backup
-          </button>
-
-          <label className="file-action">
-            Importar backup
-            <input type="file" accept="application/json" onChange={importBackup} />
-          </label>
-        </div>
-
-        {settingsStatus && (
-          <div className="settings-status" role="status">
-            {settingsStatus}
-          </div>
-        )}
-      </section>
+        <ProfileSettingsFeature
+          currentUser={currentUser}
+          state={state}
+          profileForm={profileForm}
+          themes={THEME_OPTIONS}
+          currentTheme={currentTheme}
+          storageStatus={storageStatus}
+          lastSyncedAt={lastSyncedAt}
+          standaloneMode={standaloneMode}
+          profileStatus={settingsStatus}
+          onProfileFieldChange={updateProfileField}
+          onUploadAvatar={uploadProfileAvatar}
+          onSaveProfile={saveProfile}
+          onUpdateTheme={(themeId) => onUpdateUserTheme(currentUser.id, themeId)}
+          onApplyImportedState={applyImportedState}
+          onRestoreServer={restoreFromServer}
+          installPromptAvailable={installPromptAvailable}
+          onRequestInstall={onRequestInstall}
+        />
       )}
 
 

@@ -3,6 +3,7 @@ export { default as CylinderOperationsFeature } from './cylinders/CylinderOperat
 export { default as HistoryTimelineFeature } from './history/HistoryTimelineFeature.jsx'
 export { default as AlertsCenterFeature } from './alerts/AlertsCenterFeature.jsx'
 export { default as AnalyticsFeature } from './analytics/AnalyticsFeature.jsx'
+export { default as ProfileSettingsFeature } from './profile/ProfileSettingsFeature.jsx'
 
 export const OPERATIONAL_FEATURES = Object.freeze({
   home: { module: 'dashboard', label: 'Início', implemented: true },
@@ -10,5 +11,5 @@ export const OPERATIONAL_FEATURES = Object.freeze({
   history: { module: 'history', label: 'Histórico', implemented: true },
   alerts: { module: 'alerts', label: 'Alertas', implemented: true },
   stats: { module: 'analytics', label: 'Análises', implemented: true },
-  profile: { module: 'profile', label: 'Perfil' },
+  profile: { module: 'profile', label: 'Perfil', implemented: true },
 })

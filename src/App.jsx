@@ -20,6 +20,8 @@ function App() {
   const [users, setUsers] = useState(loadUsers)
   const [session, setSession] = useState(loadSession)
   const [storageStatus, setStorageStatus] = useState('Sincronizando com MySQL...')
+  const [lastSyncedAt, setLastSyncedAt] = useState('')
+  const [installPrompt, setInstallPrompt] = useState(null)
   const [remoteReady, setRemoteReady] = useState(false)
   const saveTimerRef = useRef(null)
 
@@ -29,6 +31,15 @@ function App() {
   )
 
   useEffect(() => {
+    function captureInstallPrompt(event) {
+      event.preventDefault()
+      setInstallPrompt(event)
+    }
+    window.addEventListener('beforeinstallprompt', captureInstallPrompt)
+    return () => window.removeEventListener('beforeinstallprompt', captureInstallPrompt)
+  }, [])
+
+  useEffect(() => {
     let isActive = true
 
     loadRemoteUsers()
@@ -36,6 +47,7 @@ function App() {
         if (!isActive) return
         setUsers(remoteUsers)
         setStorageStatus('Dados sincronizados com MySQL.')
+        setLastSyncedAt(new Date().toISOString())
       })
       .catch(() => {
         if (!isActive) return
@@ -61,7 +73,10 @@ function App() {
 
     saveTimerRef.current = setTimeout(() => {
       saveRemoteUsers(users)
-        .then(() => setStorageStatus('Dados sincronizados com MySQL.'))
+        .then(() => {
+          setStorageStatus('Dados sincronizados com MySQL.')
+          setLastSyncedAt(new Date().toISOString())
+        })
         .catch(() => setStorageStatus('MySQL indisponível. Alterações salvas localmente.'))
     }, 500)
 
@@ -152,6 +167,31 @@ function App() {
     })
   }, [])
 
+  async function restoreUserFromServer(userId) {
+    try {
+      const remoteUsers = await loadRemoteUsers()
+      const restoredUser = remoteUsers.find((user) => user.id === userId)
+      if (!restoredUser) return { ok: false, message: 'Usuário não encontrado no servidor.' }
+      setUsers(remoteUsers)
+      setStorageStatus('Dados restaurados do servidor.')
+      setLastSyncedAt(new Date().toISOString())
+      return { ok: true, message: 'Dados restaurados do servidor.', user: restoredUser }
+    } catch {
+      setStorageStatus('Servidor indisponível. A restauração não foi realizada.')
+      return { ok: false, message: 'Não foi possível restaurar os dados do servidor.' }
+    }
+  }
+
+  async function requestApplicationInstall() {
+    if (!installPrompt) return { ok: false, message: 'Use o menu do navegador e escolha “Adicionar à Tela de Início” ou “Instalar aplicativo”.' }
+    await installPrompt.prompt()
+    const choice = await installPrompt.userChoice
+    setInstallPrompt(null)
+    return choice.outcome === 'accepted'
+      ? { ok: true, message: 'Instalação iniciada.' }
+      : { ok: false, message: 'Instalação cancelada.' }
+  }
+
   if (!remoteReady && session?.role === 'user') {
     return <OperationalLaunchScreen themeId={getThemeOption(currentUser?.theme).id} />
   }
@@ -173,6 +213,10 @@ function App() {
       onUpdateUserTheme={updateUserTheme}
       onLogout={logout}
       storageStatus={storageStatus}
+      lastSyncedAt={lastSyncedAt}
+      onRestoreUserFromServer={restoreUserFromServer}
+      installPromptAvailable={Boolean(installPrompt)}
+      onRequestInstall={requestApplicationInstall}
     />
   )
 }
