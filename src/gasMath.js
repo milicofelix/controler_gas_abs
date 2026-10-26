@@ -39,7 +39,7 @@ export function normalizeBrand(brand = DEFAULT_GAS_BRAND) {
   }
 }
 
-export function createHistoryEntry({ installedAt, endedAt, duration, paidValue = '', notes = '', brand = DEFAULT_GAS_BRAND }) {
+export function createHistoryEntry({ installedAt, endedAt, duration, paidValue = '', notes = '', brand = DEFAULT_GAS_BRAND, replacementReason = '', nextCylinderSource = '' }) {
   const uniqueSuffix = typeof crypto !== 'undefined' && crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -55,6 +55,8 @@ export function createHistoryEntry({ installedAt, endedAt, duration, paidValue =
     brandId: normalizedBrand.id,
     brandName: normalizedBrand.name,
     brandLogo: normalizedBrand.logo,
+    replacementReason,
+    nextCylinderSource,
   }
 }
 
@@ -87,6 +89,8 @@ export function normalizeHistory(history = []) {
         brandId: entry.brandId || entry.brand?.id || DEFAULT_GAS_BRAND.id,
         brandName: entry.brandName || entry.brand?.name || DEFAULT_GAS_BRAND.name,
         brandLogo: entry.brandLogo || entry.brand?.logo || '',
+        replacementReason: entry.replacementReason || '',
+        nextCylinderSource: entry.nextCylinderSource || '',
       }
     })
     .filter((entry) => entry && entry.duration > 0)

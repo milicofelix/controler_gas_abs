@@ -74,6 +74,8 @@ export function replaceActiveCylinder(state, {
     paidValue: state.manual?.paidValue || '',
     notes: cycleNotes,
     brand: currentBrand,
+    replacementReason: reasonText,
+    nextCylinderSource: source,
   })
 
   const nextState = {

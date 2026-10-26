@@ -34,6 +34,7 @@ import {
 import OperationalShell from './components/OperationalShell.jsx'
 import DashboardFeature from './features/dashboard/DashboardFeature.jsx'
 import CylinderOperationsFeature from './features/cylinders/CylinderOperationsFeature.jsx'
+import HistoryTimelineFeature from './features/history/HistoryTimelineFeature.jsx'
 import { useOperationalNavigation } from './hooks/useOperationalNavigation.js'
 
 function isRunningStandalone() {
@@ -222,6 +223,7 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
       reserveHistory: [
         reserveEntry,
         ...updateReserveHistoryStatus(state.reserveHistory, state.inventory?.reserveId, 'replaced', {
+          usedAt: input.purchasedAt,
           notes: `Substituído por nova compra de reserva. Motivo: ${input.reason}`,
         }),
       ].slice(0, 20),
@@ -588,51 +590,11 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
       )}
 
       {activePage === 'history' && (
-        <>
-        <section className="history-card">
-          <div className="history-header">
-            <div>
-              <span className="eyebrow">Histórico</span>
-              <h2>Últimas trocas</h2>
-            </div>
-            {state.history.length > 0 && (
-              <div className="history-average">
-                <span>Média real</span>
-                <strong>{historyStats.averageDuration} dias</strong>
-              </div>
-            )}
-          </div>
-
-          {state.history.length > 0 ? (
-            <div className="history-list">
-              {state.history.map((cycle) => (
-                <article key={cycle.id} className="history-item">
-                  <div>
-                    <strong>{cycle.duration} dias</strong>
-                    <span>{formatDisplayDate(cycle.installedAt)} até {formatDisplayDate(cycle.endedAt)}</span>
-                  </div>
-
-                  <div className="history-brand">
-                    <BrandLogo brand={{ name: cycle.brandName, logo: cycle.brandLogo }} />
-                    <span>{cycle.brandName || 'Marca não informada'}</span>
-                  </div>
-
-                  {(cycle.paidValue || cycle.notes) && (
-                    <div className="history-meta">
-                      {cycle.paidValue && <span>{formatMoney(cycle.paidValue)}</span>}
-                      {cycle.notes && <p>{cycle.notes}</p>}
-                    </div>
-                  )}
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">
-              Nenhuma troca registrada ainda. Para iniciar ou encerrar um botijão, use a tela Estoque.
-            </div>
-          )}
-        </section>
-        </>
+        <HistoryTimelineFeature
+          history={state.history}
+          reserveHistory={state.reserveHistory}
+          averageDuration={historyStats.averageDuration}
+        />
       )}
 
       {activePage === 'stats' && (

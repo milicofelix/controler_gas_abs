@@ -147,6 +147,7 @@ export default function CylinderOperationsFeature({
     if (journey === 'reserve') {
       if (!reserveForm.purchasedAt) return 'Informe a data da compra.'
       if (reserveForm.purchasedAt > today) return 'A compra não pode estar no futuro.'
+      if (reserveAvailable && state.inventory?.reservePurchasedAt && reserveForm.purchasedAt < state.inventory.reservePurchasedAt) return 'A nova reserva não pode ter data anterior à reserva atual.'
       if (reserveForm.brandId === 'outra' && !reserveForm.customBrandName.trim()) return 'Informe o nome da marca.'
       if (reserveAvailable && !reserveForm.replacementReason.trim()) return 'Informe o motivo da substituição da reserva.'
     }
