@@ -12,7 +12,8 @@ export default function OperationalLaunchScreen({ themeId = 'blue-modern' }) {
         <AppLogo className="launch-logo" />
         <div>
           <strong>Meu Gás</strong>
-          <span>Preparando sua área operacional…</span>
+          <span className="launch-area-label">Área móvel</span>
+          <small>Preparando sua operação…</small>
         </div>
       </section>
 

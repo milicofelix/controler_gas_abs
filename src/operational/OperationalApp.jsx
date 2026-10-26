@@ -36,12 +36,17 @@ import DashboardFeature from './features/dashboard/DashboardFeature.jsx'
 import CylinderOperationsFeature from './features/cylinders/CylinderOperationsFeature.jsx'
 import { useOperationalNavigation } from './hooks/useOperationalNavigation.js'
 
+function isRunningStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
+}
+
 export default function OperationalApp({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout }) {
   const { activePage, navigate: setActivePage } = useOperationalNavigation(PAGE_OPTIONS)
   const [state, setState] = useState(() => normalizeGasState(currentUser.state))
   const [stockIntent, setStockIntent] = useState('')
   const [notificationStatus, setNotificationStatus] = useState('')
   const [settingsStatus, setSettingsStatus] = useState('')
+  const [standaloneMode, setStandaloneMode] = useState(isRunningStandalone)
   const replacementLockRef = useRef(false)
   const [profileForm, setProfileForm] = useState(() => ({
     name: currentUser.name || '',
@@ -115,6 +120,14 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
   useEffect(() => {
     onUpdateUserState(currentUser.id, state)
   }, [currentUser.id, onUpdateUserState, state])
+
+  useEffect(() => {
+    const displayMode = window.matchMedia('(display-mode: standalone)')
+    const updateDisplayMode = () => setStandaloneMode(isRunningStandalone())
+
+    displayMode.addEventListener('change', updateDisplayMode)
+    return () => displayMode.removeEventListener('change', updateDisplayMode)
+  }, [])
 
 
   function updateProfileField(field, value) {
@@ -420,6 +433,17 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
           <div className={`status-pill ${stats.status.tone}`}>{stats.status.label}</div>
           <button type="button" className="logout-button" onClick={onLogout}>Encerrar sessão</button>
         </div>
+      </section>
+
+      <section className="mobile-area-banner" aria-label="Identificação da área móvel">
+        <span className="mobile-area-icon" aria-hidden="true">▣</span>
+        <div>
+          <strong>Área móvel</strong>
+          <small>Operação rápida de botijões</small>
+        </div>
+        <span className={`mobile-runtime-status ${standaloneMode ? 'standalone' : 'browser'}`}>
+          {standaloneMode ? 'Modo aplicativo' : 'Aberto no navegador'}
+        </span>
       </section>
 
       {activePage !== 'home' && (

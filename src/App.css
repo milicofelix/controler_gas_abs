@@ -3788,6 +3788,89 @@ button.ghost,
 }
 
 /* PWA Fase 2 — jornadas de operação dos botijões */
+.mobile-area-banner {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--primary-end) 30%, var(--card-border));
+  border-radius: 18px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--card-bg) 88%, var(--primary-start) 12%);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+
+.mobile-area-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary-start), var(--primary-end));
+  font-size: 20px;
+}
+
+.mobile-area-banner > div {
+  display: grid;
+  min-width: 0;
+}
+
+.mobile-area-banner strong {
+  color: var(--text-strong);
+  font-size: 14px;
+}
+
+.mobile-area-banner small {
+  color: var(--text-soft);
+  font-size: 11px;
+}
+
+.mobile-runtime-status {
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: var(--text-muted);
+  background: var(--surface-deep);
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.mobile-runtime-status.standalone {
+  color: #166534;
+  background: rgba(34, 197, 94, 0.16);
+}
+
+.launch-area-label {
+  display: block;
+  width: fit-content;
+  margin-top: 4px;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary-start), var(--primary-end));
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.launch-brand small {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-soft);
+}
+
+@media (max-width: 430px) {
+  .mobile-area-banner {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .mobile-runtime-status {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    text-align: center;
+  }
+}
+
 .cylinder-operations {
   display: grid;
   gap: 16px;
