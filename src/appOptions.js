@@ -8,7 +8,7 @@ export const THEME_OPTIONS = [
 export const PAGE_OPTIONS = [
   { id: 'home', label: 'Início', icon: '⌂' },
   { id: 'history', label: 'Histórico', icon: '↺' },
-  { id: 'stock', label: 'Estoque', icon: '▣' },
+  { id: 'stock', label: 'Operação', icon: '▣' },
   { id: 'stats', label: 'Análises', icon: '▥' },
   { id: 'alerts', label: 'Alertas', icon: '!' },
   { id: 'profile', label: 'Perfil', icon: '♙' },

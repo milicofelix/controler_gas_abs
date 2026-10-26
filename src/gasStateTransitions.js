@@ -18,6 +18,7 @@ export function replaceActiveCylinder(state, {
   endedAt,
   source = 'manual',
   reasonText = '',
+  nextCylinder = {},
   historyLimit = 8,
 } = {}) {
   if (!state?.hasActiveCylinder || !state.startedAt) {
@@ -52,9 +53,20 @@ export function replaceActiveCylinder(state, {
   const reserveBrand = state.inventory?.reserveBrand
     ? normalizeBrand(state.inventory.reserveBrand)
     : currentBrand
+  const nextBrand = usesReserve
+    ? reserveBrand
+    : normalizeBrand(nextCylinder.brand || currentBrand)
+  const sourceLabels = {
+    reserve: 'Troca pelo botijão reserva.',
+    direct: 'Troca por botijão comprado diretamente.',
+    other: 'Troca por outro botijão disponível.',
+    manual: 'Troca de botijão.',
+  }
   const cycleNotes = usesReserve
     ? [state.manual?.notes, `Troca pelo botijão reserva. Motivo: ${reasonText}`].filter(Boolean).join(' ')
-    : state.manual?.notes || ''
+    : [state.manual?.notes, sourceLabels[source] || sourceLabels.manual, reasonText && `Motivo: ${reasonText}`]
+        .filter(Boolean)
+        .join(' ')
   const finishedCycle = createHistoryEntry({
     installedAt: state.startedAt,
     endedAt,
@@ -70,7 +82,7 @@ export function replaceActiveCylinder(state, {
     startedAt: endedAt,
     history: [finishedCycle, ...(state.history || [])].slice(0, historyLimit),
     lastFinishedCycle: finishedCycle,
-    currentBrand: usesReserve ? reserveBrand : currentBrand,
+    currentBrand: nextBrand,
     manual: usesReserve
       ? createManualFields({
           startedAt: endedAt,
@@ -80,7 +92,12 @@ export function replaceActiveCylinder(state, {
             ? `Botijão reserva comprado em ${formatDisplayDate(state.inventory.reservePurchasedAt)}.`
             : '',
         })
-      : createManualFields({ startedAt: endedAt, endedAt }),
+      : createManualFields({
+          startedAt: endedAt,
+          endedAt,
+          paidValue: nextCylinder.paidValue || '',
+          notes: nextCylinder.notes || '',
+        }),
     reminder: { enabled: false, scheduledFor: '' },
   }
 
@@ -104,4 +121,41 @@ export function replaceActiveCylinder(state, {
   }
 
   return { ok: true, message: `Troca registrada com ${duration} dias de uso.`, state: nextState }
+}
+
+export function startCylinderControl(state, {
+  installedAt,
+  brand,
+  paidValue = '',
+  notes = '',
+  today,
+} = {}) {
+  if (state?.hasActiveCylinder) {
+    return { ok: false, message: 'Já existe um botijão em uso.', state }
+  }
+
+  if (!installedAt) {
+    return { ok: false, message: 'Informe a data da instalação.', state }
+  }
+
+  if (today && installedAt > today) {
+    return { ok: false, message: 'A instalação não pode estar no futuro.', state }
+  }
+
+  const nextBrand = normalizeBrand(brand || DEFAULT_GAS_BRAND)
+  const nextState = {
+    ...state,
+    hasActiveCylinder: true,
+    startedAt: installedAt,
+    currentBrand: nextBrand,
+    manual: createManualFields({
+      startedAt: installedAt,
+      endedAt: installedAt,
+      paidValue,
+      notes,
+    }),
+    reminder: { enabled: false, scheduledFor: '' },
+  }
+
+  return { ok: true, message: 'Controle do botijão iniciado.', state: nextState }
 }
