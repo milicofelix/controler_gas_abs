@@ -75,7 +75,7 @@ export default function DashboardFeature({
           <strong>{hasActiveCylinder ? stats.remainingDays : '-'}</strong>
         </article>
         <article>
-          <span>Média de consumo</span>
+          <span>{intelligence.isUsingRealAverage ? 'Média real' : 'Referência inicial'}</span>
           <strong>{intelligence.projectedCycleDays}</strong>
           <small>dias/botijão</small>
         </article>
@@ -101,6 +101,20 @@ export default function DashboardFeature({
           </div>
           <button type="button" className="ghost compact-button" onClick={() => onNavigate('alerts')}>
             Ver alertas
+          </button>
+        </section>
+      )}
+
+      {!hasActiveCylinder && (
+        <section className="dashboard-empty-state">
+          <div className="dashboard-empty-icon" aria-hidden="true">+</div>
+          <div>
+            <span className="eyebrow">Primeiro passo</span>
+            <h2>Cadastre o botijão que está em uso</h2>
+            <p>A data de instalação inicia a contagem, a previsão e os alertas da residência.</p>
+          </div>
+          <button type="button" className="primary" onClick={() => onNavigate('stock')}>
+            Iniciar controle
           </button>
         </section>
       )}

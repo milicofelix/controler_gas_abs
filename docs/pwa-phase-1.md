@@ -18,6 +18,21 @@ A tela inicial foi isolada em `operational/features/dashboard` e passou a consum
 
 O dashboard não cria ciclos nem movimenta estoque diretamente. Trocas continuam passando pela transição de domínio centralizada, e a configuração detalhada permanece na tela de estoque até a Fase 2.
 
+## Critérios concluídos
+
+- perguntas operacionais respondidas no primeiro painel;
+- nível, duração, previsão e média identificados;
+- média real diferenciada da referência inicial;
+- botijão atual e reserva visíveis;
+- alerta prioritário e atalhos operacionais;
+- cabeçalho compacto;
+- navegação inferior fixa;
+- áreas de toque com pelo menos 48 px no dashboard;
+- `safe-area` aplicada ao shell, carregamento e navegação;
+- skeleton de carregamento durante a sincronização inicial;
+- estado orientado para residência sem botijão;
+- indicador online/offline.
+
 ## Teste manual
 
 ### 1. Abrir o ambiente correto
@@ -81,6 +96,15 @@ No início da tela devem aparecer estes elementos novos:
 - botão `Usar reserva` ou `Cadastrar reserva`;
 - botão `Ativar lembrete` ou `Reagendar lembrete`;
 - botão `Ver histórico`.
+
+Ao atualizar a página com uma sessão já ativa, deve aparecer brevemente a tela `Preparando sua área operacional…`, com skeleton do painel e dos indicadores.
+
+No cartão de indicadores, confira um destes rótulos:
+
+- `Média real`, quando há histórico suficiente;
+- `Referência inicial`, quando ainda não há histórico suficiente.
+
+Se a residência estiver sem botijão ativo, deve aparecer o card `Primeiro passo` com a ação `Iniciar controle`.
 
 ### 6. Conferir as ações rápidas
 

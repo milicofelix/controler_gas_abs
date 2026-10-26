@@ -13,6 +13,7 @@ import { getThemeOption } from './appOptions.js'
 import LoginScreen from './auth/LoginScreen.jsx'
 import AdminDashboard from './admin/AdminDashboard.jsx'
 import OperationalApp from './operational/OperationalApp.jsx'
+import OperationalLaunchScreen from './operational/components/OperationalLaunchScreen.jsx'
 import './App.css'
 
 function App() {
@@ -150,6 +151,10 @@ function App() {
       return hasChanges ? nextUsers : current
     })
   }, [])
+
+  if (!remoteReady && session?.role === 'user') {
+    return <OperationalLaunchScreen themeId={getThemeOption(currentUser?.theme).id} />
+  }
 
   if (!currentUser) {
     return <LoginScreen users={users} onLogin={login} onCreateUser={createNewUser} />

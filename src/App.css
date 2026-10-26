@@ -882,6 +882,220 @@ button.ghost,
   }
 }
 
+/* PWA Fase 1 — fechamento dos estados operacionais */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.user-shell .hero-card {
+  min-height: 72px;
+  padding: max(10px, env(safe-area-inset-top)) 14px 10px;
+}
+
+.user-shell .header-logo {
+  width: 88px;
+  height: 56px;
+  flex-basis: 88px;
+  border-radius: 13px;
+}
+
+.user-shell .brand-row {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+}
+
+.user-shell .logout-button {
+  min-height: 44px;
+}
+
+.operational-dashboard button,
+.operational-dashboard .compact-button {
+  min-height: 48px;
+  touch-action: manipulation;
+}
+
+.dashboard-empty-state {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  border: 1px dashed color-mix(in srgb, var(--primary-end) 34%, var(--card-border));
+  border-radius: 22px;
+  padding: 18px;
+  background: color-mix(in srgb, var(--card-bg) 90%, var(--primary-start) 10%);
+}
+
+.dashboard-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--primary-start), var(--primary-end));
+  font-size: 28px;
+  font-weight: 500;
+}
+
+.dashboard-empty-state h2 {
+  margin: 5px 0 0;
+  color: var(--text-strong);
+  font-size: 19px;
+  line-height: 1.2;
+}
+
+.dashboard-empty-state p {
+  margin: 7px 0 0;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.dashboard-empty-state button {
+  grid-column: 1 / -1;
+}
+
+.operational-launch-screen {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  min-height: 100svh;
+  padding-top: max(22px, env(safe-area-inset-top));
+  padding-right: max(16px, env(safe-area-inset-right));
+  padding-bottom: max(22px, env(safe-area-inset-bottom));
+  padding-left: max(16px, env(safe-area-inset-left));
+}
+
+.launch-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 4px;
+}
+
+.launch-logo {
+  width: 72px;
+  height: 58px;
+  border-radius: 16px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+}
+
+.launch-brand > div {
+  display: grid;
+  gap: 4px;
+}
+
+.launch-brand strong {
+  color: var(--text-strong);
+  font-size: 20px;
+}
+
+.launch-brand span {
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.launch-dashboard-skeleton {
+  position: relative;
+  min-height: 290px;
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+  border-radius: 28px;
+  padding: 24px;
+  background: var(--card-bg);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+}
+
+.launch-skeleton {
+  display: block;
+  overflow: hidden;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--text-muted) 16%, transparent);
+}
+
+.launch-skeleton::after {
+  content: '';
+  display: block;
+  width: 42%;
+  height: 100%;
+  transform: translateX(-150%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  animation: operational-skeleton 1.35s ease-in-out infinite;
+}
+
+.launch-skeleton-title {
+  width: 42%;
+  height: 20px;
+}
+
+.launch-skeleton-cylinder {
+  position: absolute;
+  right: 11%;
+  bottom: 24px;
+  width: 34%;
+  height: 210px;
+  border-radius: 46px 46px 30px 30px;
+}
+
+.launch-skeleton-reading {
+  position: absolute;
+  left: 24px;
+  top: 38%;
+  width: 34%;
+  height: 62px;
+}
+
+.launch-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.launch-metrics .launch-skeleton {
+  height: 92px;
+}
+
+@keyframes operational-skeleton {
+  to { transform: translateX(340%); }
+}
+
+@media (max-width: 430px) {
+  .user-shell .header-session span {
+    display: none;
+  }
+
+  .user-shell .hero-actions {
+    gap: 10px;
+  }
+
+  .dashboard-empty-state {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-empty-icon {
+    width: 46px;
+    height: 46px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launch-skeleton::after {
+    animation: none;
+  }
+}
+
 /* PWA Fase 1 — dashboard operacional */
 .operational-dashboard {
   padding-bottom: 8px;
@@ -3543,5 +3757,32 @@ button.ghost,
   .header-identity small {
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+}
+
+/* Mantém o cabeçalho operacional compacto após as variações de tema. */
+.user-shell .hero-card {
+  min-height: 72px;
+  padding: max(10px, env(safe-area-inset-top)) 14px 10px;
+}
+
+.user-shell .header-logo {
+  width: 88px;
+  height: 56px;
+  flex-basis: 88px;
+}
+
+.user-shell .brand-row {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+}
+
+.user-shell .logout-button {
+  min-height: 44px;
+}
+
+@media (max-width: 430px) {
+  .user-shell .header-session span {
+    display: none;
   }
 }
