@@ -11,7 +11,7 @@ import {
   saveRemoteUsers,
   saveUsers,
 } from './authStorage.js'
-import { activateServiceWorkerUpdate } from './pwa.js'
+import { activateServiceWorkerUpdate, clearApplicationCaches } from './pwa.js'
 import { formatDateInput } from './gasMath.js'
 import { getThemeOption } from './appOptions.js'
 import LoginScreen from './auth/LoginScreen.jsx'
@@ -26,6 +26,7 @@ function App() {
   const [storageStatus, setStorageStatus] = useState('Sincronizando com MySQL...')
   const [lastSyncedAt, setLastSyncedAt] = useState('')
   const [installPrompt, setInstallPrompt] = useState(null)
+  const [installationStatus, setInstallationStatus] = useState('')
   const [updateRegistration, setUpdateRegistration] = useState(null)
   const [remoteReady, setRemoteReady] = useState(false)
   const saveTimerRef = useRef(null)
@@ -41,7 +42,15 @@ function App() {
       setInstallPrompt(event)
     }
     window.addEventListener('beforeinstallprompt', captureInstallPrompt)
-    return () => window.removeEventListener('beforeinstallprompt', captureInstallPrompt)
+    function handleInstalled() {
+      setInstallPrompt(null)
+      setInstallationStatus('Aplicativo instalado com sucesso.')
+    }
+    window.addEventListener('appinstalled', handleInstalled)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', captureInstallPrompt)
+      window.removeEventListener('appinstalled', handleInstalled)
+    }
   }, [])
 
   useEffect(() => {
@@ -136,9 +145,15 @@ function App() {
     saveSession(nextSession)
   }
 
-  function logout() {
+  async function logout() {
     setSession(null)
     clearSession()
+    clearPendingSync()
+    try {
+      await clearApplicationCaches()
+    } catch {
+      // O encerramento da sessão não deve depender da disponibilidade do Cache API.
+    }
   }
 
   function createNewUser(user) {
@@ -259,6 +274,7 @@ function App() {
       lastSyncedAt={lastSyncedAt}
       onRestoreUserFromServer={restoreUserFromServer}
       installPromptAvailable={Boolean(installPrompt)}
+      installationStatus={installationStatus}
       onRequestInstall={requestApplicationInstall}
       updateAvailable={Boolean(updateRegistration?.waiting)}
       onUpdateNow={updateApplicationNow}

@@ -52,15 +52,36 @@ export default function ProfileSettingsFeature({
   onApplyImportedState,
   onRestoreServer,
   installPromptAvailable,
+  installationStatus,
   onRequestInstall,
   updateAvailable,
   onUpdateNow,
+  updateBlocked,
+  onEditingChange,
 }) {
   const [status, setStatus] = useState('')
   const [pendingImport, setPendingImport] = useState(null)
   const [confirmAction, setConfirmAction] = useState('')
   const [notificationPermission, setNotificationPermission] = useState('Verificando…')
   const [updateStatus, setUpdateStatus] = useState('Verificando…')
+  const [showInstallGuide, setShowInstallGuide] = useState(false)
+
+  const savedProfile = {
+    name: currentUser.name || '',
+    homeName: currentUser.homeName || '',
+    email: currentUser.email || '',
+    password: currentUser.password || '',
+    city: currentUser.residenceProfile?.city || '',
+    state: currentUser.residenceProfile?.state || '',
+    whatsapp: currentUser.residenceProfile?.whatsapp || '',
+    avatar: currentUser.residenceProfile?.avatar || '',
+  }
+  const profileChanged = JSON.stringify(profileForm) !== JSON.stringify(savedProfile)
+
+  useEffect(() => {
+    onEditingChange?.(profileChanged || Boolean(pendingImport) || Boolean(confirmAction))
+    return () => onEditingChange?.(false)
+  }, [confirmAction, onEditingChange, pendingImport, profileChanged])
 
   useEffect(() => {
     async function inspectApplication() {
@@ -139,6 +160,10 @@ export default function ProfileSettingsFeature({
   }
 
   async function installApplication() {
+    if (!installPromptAvailable) {
+      setShowInstallGuide(true)
+      return
+    }
     const result = await onRequestInstall()
     setStatus(result.message)
   }
@@ -189,8 +214,8 @@ export default function ProfileSettingsFeature({
 
       <section className="settings-group application-settings">
         <div className="settings-group-heading"><div><span className="eyebrow">Aplicativo</span><h2>Instalação e permissões</h2></div></div>
-        <div className="application-facts"><article><span>Versão</span><strong>{APP_VERSION}</strong></article><article><span>Instalação</span><strong>{Capacitor.isNativePlatform() ? 'Aplicativo nativo' : standaloneMode ? 'PWA instalada' : 'Aberto no navegador'}</strong></article><article><span>Atualização</span><strong>{updateAvailable ? 'Atualização disponível' : updateStatus}</strong>{updateAvailable && <button type="button" className="compact-button" onClick={onUpdateNow}>Atualizar agora</button>}</article><article><span>Notificações</span><strong>{notificationPermission}</strong></article></div>
-        {!Capacitor.isNativePlatform() && !standaloneMode && <div className="install-instructions"><div><strong>Instale para usar como aplicativo</strong><p>No iPhone, use Compartilhar → Adicionar à Tela de Início. No Android ou desktop, use a opção Instalar do navegador.</p></div><button type="button" className="primary" onClick={installApplication}>{installPromptAvailable ? 'Instalar aplicativo' : 'Ver como instalar'}</button></div>}
+        <div className="application-facts"><article><span>Versão</span><strong>{APP_VERSION}</strong></article><article><span>Instalação</span><strong>{Capacitor.isNativePlatform() ? 'Aplicativo nativo' : standaloneMode ? 'PWA instalada' : installationStatus || 'Aberto no navegador'}</strong></article><article><span>Atualização</span><strong>{updateAvailable ? 'Atualização disponível' : updateStatus}</strong>{updateAvailable && <button type="button" className="compact-button" onClick={onUpdateNow}>Atualizar agora</button>}{updateAvailable && updateBlocked && <small>Finalize ou cancele o formulário aberto.</small>}</article><article><span>Notificações</span><strong>{notificationPermission}</strong></article></div>
+        {!Capacitor.isNativePlatform() && !standaloneMode && <div className="install-instructions"><div><strong>Instale para usar como aplicativo</strong><p>Acesse mais rápido, use em tela cheia e abra a interface mesmo sem conexão.</p></div><div className="install-actions"><button type="button" className="primary" onClick={installApplication}>{installPromptAvailable ? 'Instalar aplicativo' : 'Ver como instalar'}</button><button type="button" className="ghost" onClick={() => setShowInstallGuide(true)}>Guia de instalação</button></div></div>}
       </section>
 
       {(status || profileStatus) && <div className="settings-status" role="status">{status || profileStatus}</div>}
@@ -198,6 +223,8 @@ export default function ProfileSettingsFeature({
       {pendingImport && <div className="operation-sheet-backdrop" role="presentation"><section className="operation-sheet" role="dialog" aria-modal="true" aria-labelledby="import-title"><div className="operation-sheet-handle"></div><header><div><span className="eyebrow">Revisar importação</span><h2 id="import-title">Substituir os dados atuais?</h2></div><button type="button" className="sheet-close" onClick={() => setPendingImport(null)}>×</button></header><dl className="operation-summary"><div><dt>Ciclos</dt><dd>{pendingImport.summary.cycles}</dd></div><div><dt>Reservas</dt><dd>{pendingImport.summary.reserves}</dd></div><div><dt>Duplicidades</dt><dd>{pendingImport.summary.duplicates}</dd></div><div><dt>Inconsistências</dt><dd>{pendingImport.summary.inconsistencies}</dd></div><div><dt>Botijão ativo</dt><dd>{pendingImport.summary.hasActiveCylinder ? 'Sim' : 'Não'}</dd></div><div><dt>Reserva disponível</dt><dd>{pendingImport.summary.hasReserve ? 'Sim' : 'Não'}</dd></div></dl>{(pendingImport.summary.duplicates > 0 || pendingImport.summary.inconsistencies > 0) && <div className="import-warning">O arquivo possui alertas. Revise os números antes de continuar.</div>}<footer><button type="button" className="ghost" onClick={() => setPendingImport(null)}>Cancelar</button><button type="button" className="primary" onClick={confirmImport}>Criar cópia e importar</button></footer></section></div>}
 
       {confirmAction && <div className="operation-sheet-backdrop" role="presentation"><section className="operation-sheet" role="dialog" aria-modal="true" aria-labelledby="data-confirm-title"><div className="operation-sheet-handle"></div><header><div><span className="eyebrow">Confirmação</span><h2 id="data-confirm-title">{confirmAction === 'clear' ? 'Limpar cópia local?' : 'Restaurar dados do servidor?'}</h2></div><button type="button" className="sheet-close" onClick={() => setConfirmAction('')}>×</button></header><div className="permission-fallback"><p>{confirmAction === 'clear' ? 'A sessão atual e os dados do servidor não serão apagados. O cache poderá ser criado novamente durante o uso.' : 'O estado operacional atual será substituído pela versão encontrada no servidor.'}</p></div><footer><button type="button" className="ghost" onClick={() => setConfirmAction('')}>Cancelar</button><button type="button" className={confirmAction === 'clear' ? 'danger-button' : 'primary'} onClick={confirmAction === 'clear' ? clearLocalData : restoreServerData}>Confirmar</button></footer></section></div>}
+
+      {showInstallGuide && <div className="operation-sheet-backdrop" role="presentation"><section className="operation-sheet install-guide-sheet" role="dialog" aria-modal="true" aria-labelledby="install-guide-title"><div className="operation-sheet-handle"></div><header><div><span className="eyebrow">Instalar aplicativo</span><h2 id="install-guide-title">Coloque o Meu Gás na tela inicial</h2></div><button type="button" className="sheet-close" onClick={() => setShowInstallGuide(false)}>×</button></header><div className="install-guide-list"><article><strong>iPhone e iPad — Safari</strong><ol><li>Abra esta página no Safari.</li><li>Toque no botão Compartilhar.</li><li>Escolha “Adicionar à Tela de Início”.</li><li>Confirme em “Adicionar”.</li></ol><small>Em outros navegadores do iOS, abra primeiro no Safari.</small></article><article><strong>Android — Chrome</strong><ol><li>Abra o menu de três pontos.</li><li>Toque em “Instalar app” ou “Adicionar à tela inicial”.</li><li>Confirme a instalação.</li></ol></article><article><strong>Computador</strong><ol><li>Procure o ícone de instalação na barra de endereço.</li><li>Clique em “Instalar”.</li></ol></article></div><footer><button type="button" className="primary" onClick={() => setShowInstallGuide(false)}>Entendi</button></footer></section></div>}
     </div>
   )
 }

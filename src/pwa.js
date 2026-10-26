@@ -41,3 +41,11 @@ export function activateServiceWorkerUpdate(registration) {
   registration.waiting.postMessage({ type: 'SKIP_WAITING' })
   return true
 }
+
+export async function clearApplicationCaches() {
+  if (!('caches' in window)) return
+  const cacheNames = await window.caches.keys()
+  await Promise.all(cacheNames
+    .filter((name) => name.startsWith('meu-gas-shell'))
+    .map((name) => window.caches.delete(name)))
+}

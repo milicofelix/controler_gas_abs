@@ -66,6 +66,7 @@ export default function CylinderOperationsFeature({
   onReplaceCylinder,
   onSaveReserve,
   onRemoveReserve,
+  onEditingChange,
 }) {
   const reserveAvailable = Boolean(state.inventory?.reserveAvailable)
   const [journey, setJourney] = useState(null)
@@ -96,6 +97,11 @@ export default function CylinderOperationsFeature({
     replacementReason: '',
   })
   const [removeReason, setRemoveReason] = useState('')
+
+  useEffect(() => {
+    onEditingChange?.(Boolean(journey))
+    return () => onEditingChange?.(false)
+  }, [journey, onEditingChange])
 
   useEffect(() => {
     if (!initialIntent) return

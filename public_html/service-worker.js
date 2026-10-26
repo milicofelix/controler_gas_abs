@@ -1,5 +1,5 @@
 const CACHE_PREFIX = 'meu-gas-shell'
-const CACHE_VERSION = 'v7-2026-10-26'
+const CACHE_VERSION = 'v9-2026-10-26'
 const STATIC_CACHE = `${CACHE_PREFIX}-${CACHE_VERSION}`
 const CORE_ASSETS = ['/', '/offline.html', '/manifest.webmanifest', '/favicon.svg', '/icons.svg', '/icons/icon-48.webp', '/icons/icon-72.webp', '/icons/icon-96.webp', '/icons/icon-128.webp', '/icons/icon-192.webp', '/icons/icon-256.webp', '/icons/icon-512.webp', '/screenshots/dashboard-mobile.svg', '/screenshots/dashboard-wide.svg']
 

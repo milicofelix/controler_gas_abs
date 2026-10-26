@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { Capacitor } from '@capacitor/core'
 import {
@@ -38,7 +38,7 @@ function isRunningStandalone() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
 }
 
-export default function OperationalApp({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout, storageStatus, lastSyncedAt, onRestoreUserFromServer, installPromptAvailable, onRequestInstall, updateAvailable, onUpdateNow }) {
+export default function OperationalApp({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout, storageStatus, lastSyncedAt, onRestoreUserFromServer, installPromptAvailable, installationStatus, onRequestInstall, updateAvailable, onUpdateNow }) {
   const { activePage, navigate: setActivePage } = useOperationalNavigation(PAGE_OPTIONS)
   const [state, setState] = useState(() => normalizeGasState(currentUser.state))
   const [stockIntent, setStockIntent] = useState('')
@@ -46,6 +46,8 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
   const [notificationStatus, setNotificationStatus] = useState('')
   const [settingsStatus, setSettingsStatus] = useState('')
   const [standaloneMode, setStandaloneMode] = useState(isRunningStandalone)
+  const [editingContexts, setEditingContexts] = useState({})
+  const [updateProtectionMessage, setUpdateProtectionMessage] = useState('')
   const replacementLockRef = useRef(false)
   const [profileForm, setProfileForm] = useState(() => ({
     name: currentUser.name || '',
@@ -59,6 +61,7 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
   }))
   const currentTheme = getThemeOption(currentUser.theme)
   const currentBrand = normalizeBrand(state.currentBrand)
+  const hasUnsavedForm = Object.values(editingContexts).some(Boolean)
 
   const today = formatDateInput(new Date())
   const hasActiveCylinder = Boolean(state.hasActiveCylinder && state.startedAt)
@@ -192,6 +195,24 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
   function requestReminderFlow() {
     setAlertsIntent('reminder')
     setActivePage('alerts')
+  }
+
+  const setEditingContext = useCallback((context, active) => {
+    setEditingContexts((current) => {
+      if (current[context] === active) return current
+      return { ...current, [context]: active }
+    })
+  }, [])
+  const handleCylinderEditing = useCallback((active) => setEditingContext('cylinder-operation', active), [setEditingContext])
+  const handleProfileEditing = useCallback((active) => setEditingContext('profile', active), [setEditingContext])
+
+  function requestApplicationUpdate() {
+    if (hasUnsavedForm) {
+      setUpdateProtectionMessage('Conclua ou cancele o formulário aberto antes de atualizar. Seus dados preenchidos foram preservados.')
+      return
+    }
+    setUpdateProtectionMessage('')
+    onUpdateNow()
   }
 
   function startControl(input) {
@@ -429,8 +450,8 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
 
       {updateAvailable && (
         <section className="pwa-update-banner" role="status">
-          <div><strong>Atualização disponível</strong><span>Uma nova versão do Meu Gás está pronta.</span></div>
-          <button type="button" className="primary" onClick={onUpdateNow}>Atualizar agora</button>
+          <div><strong>Atualização disponível</strong><span>{hasUnsavedForm ? 'Finalize o formulário aberto para atualizar com segurança.' : 'Uma nova versão do Meu Gás está pronta.'}</span>{updateProtectionMessage && <small>{updateProtectionMessage}</small>}</div>
+          <button type="button" className="primary" onClick={requestApplicationUpdate}>Atualizar agora</button>
         </section>
       )}
 
@@ -469,6 +490,7 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
           onReplaceCylinder={performCylinderReplacement}
           onSaveReserve={saveReserve}
           onRemoveReserve={removeReserve}
+          onEditingChange={handleCylinderEditing}
         />
       )}
 
@@ -519,9 +541,12 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
           onApplyImportedState={applyImportedState}
           onRestoreServer={restoreFromServer}
           installPromptAvailable={installPromptAvailable}
+          installationStatus={installationStatus}
           onRequestInstall={onRequestInstall}
           updateAvailable={updateAvailable}
-          onUpdateNow={onUpdateNow}
+          onUpdateNow={requestApplicationUpdate}
+          updateBlocked={hasUnsavedForm}
+          onEditingChange={handleProfileEditing}
         />
       )}
 
