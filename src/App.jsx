@@ -1,13 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   clearSession,
+  clearPendingSync,
   loadSession,
+  loadPendingSync,
   loadRemoteUsers,
   loadUsers,
   saveSession,
+  queuePendingSync,
   saveRemoteUsers,
   saveUsers,
 } from './authStorage.js'
+import { activateServiceWorkerUpdate } from './pwa.js'
 import { formatDateInput } from './gasMath.js'
 import { getThemeOption } from './appOptions.js'
 import LoginScreen from './auth/LoginScreen.jsx'
@@ -22,6 +26,7 @@ function App() {
   const [storageStatus, setStorageStatus] = useState('Sincronizando com MySQL...')
   const [lastSyncedAt, setLastSyncedAt] = useState('')
   const [installPrompt, setInstallPrompt] = useState(null)
+  const [updateRegistration, setUpdateRegistration] = useState(null)
   const [remoteReady, setRemoteReady] = useState(false)
   const saveTimerRef = useRef(null)
 
@@ -37,6 +42,14 @@ function App() {
     }
     window.addEventListener('beforeinstallprompt', captureInstallPrompt)
     return () => window.removeEventListener('beforeinstallprompt', captureInstallPrompt)
+  }, [])
+
+  useEffect(() => {
+    function handleUpdate(event) {
+      setUpdateRegistration(event.detail)
+    }
+    window.addEventListener('pwa:update-available', handleUpdate)
+    return () => window.removeEventListener('pwa:update-available', handleUpdate)
   }, [])
 
   useEffect(() => {
@@ -74,10 +87,14 @@ function App() {
     saveTimerRef.current = setTimeout(() => {
       saveRemoteUsers(users)
         .then(() => {
+          clearPendingSync()
           setStorageStatus('Dados sincronizados com MySQL.')
           setLastSyncedAt(new Date().toISOString())
         })
-        .catch(() => setStorageStatus('MySQL indisponível. Alterações salvas localmente.'))
+        .catch(() => {
+          queuePendingSync()
+          setStorageStatus('MySQL indisponível. Alterações salvas localmente e aguardando sincronização.')
+        })
     }, 500)
 
     return () => {
@@ -86,6 +103,27 @@ function App() {
       }
     }
   }, [remoteReady, users])
+
+  useEffect(() => {
+    async function synchronizePendingChanges() {
+      if (!loadPendingSync()) return
+      try {
+        await saveRemoteUsers(users)
+        clearPendingSync()
+        setStorageStatus('Alterações pendentes sincronizadas.')
+        setLastSyncedAt(new Date().toISOString())
+      } catch {
+        queuePendingSync('retry-failed')
+        setStorageStatus('Sincronização pendente. Tentaremos novamente quando houver conexão.')
+      }
+    }
+    window.addEventListener('online', synchronizePendingChanges)
+    window.addEventListener('pwa:sync-requested', synchronizePendingChanges)
+    return () => {
+      window.removeEventListener('online', synchronizePendingChanges)
+      window.removeEventListener('pwa:sync-requested', synchronizePendingChanges)
+    }
+  }, [users])
 
   useEffect(() => {
     const theme = currentUser?.theme || 'blue-modern'
@@ -192,6 +230,11 @@ function App() {
       : { ok: false, message: 'Instalação cancelada.' }
   }
 
+  function updateApplicationNow() {
+    if (!activateServiceWorkerUpdate(updateRegistration)) return
+    setStorageStatus('Atualizando o aplicativo…')
+  }
+
   if (!remoteReady && session?.role === 'user') {
     return <OperationalLaunchScreen themeId={getThemeOption(currentUser?.theme).id} />
   }
@@ -217,6 +260,8 @@ function App() {
       onRestoreUserFromServer={restoreUserFromServer}
       installPromptAvailable={Boolean(installPrompt)}
       onRequestInstall={requestApplicationInstall}
+      updateAvailable={Boolean(updateRegistration?.waiting)}
+      onUpdateNow={updateApplicationNow}
     />
   )
 }

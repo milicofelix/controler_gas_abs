@@ -38,7 +38,7 @@ function isRunningStandalone() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
 }
 
-export default function OperationalApp({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout, storageStatus, lastSyncedAt, onRestoreUserFromServer, installPromptAvailable, onRequestInstall }) {
+export default function OperationalApp({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout, storageStatus, lastSyncedAt, onRestoreUserFromServer, installPromptAvailable, onRequestInstall, updateAvailable, onUpdateNow }) {
   const { activePage, navigate: setActivePage } = useOperationalNavigation(PAGE_OPTIONS)
   const [state, setState] = useState(() => normalizeGasState(currentUser.state))
   const [stockIntent, setStockIntent] = useState('')
@@ -109,6 +109,16 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
     displayMode.addEventListener('change', updateDisplayMode)
     return () => displayMode.removeEventListener('change', updateDisplayMode)
   }, [])
+
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const shortcutAction = url.searchParams.get('action')
+    if (!['replace', 'replace-reserve', 'reserve'].includes(shortcutAction)) return
+    setStockIntent(shortcutAction)
+    setActivePage('stock')
+    url.searchParams.delete('action')
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+  }, [setActivePage])
 
 
   function updateProfileField(field, value) {
@@ -417,6 +427,13 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
         </span>
       </section>
 
+      {updateAvailable && (
+        <section className="pwa-update-banner" role="status">
+          <div><strong>Atualização disponível</strong><span>Uma nova versão do Meu Gás está pronta.</span></div>
+          <button type="button" className="primary" onClick={onUpdateNow}>Atualizar agora</button>
+        </section>
+      )}
+
       {activePage !== 'home' && (
         <section className="page-heading">
           <span className="eyebrow">Página atual</span>
@@ -503,6 +520,8 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
           onRestoreServer={restoreFromServer}
           installPromptAvailable={installPromptAvailable}
           onRequestInstall={onRequestInstall}
+          updateAvailable={updateAvailable}
+          onUpdateNow={onUpdateNow}
         />
       )}
 

@@ -148,6 +148,10 @@ app.put('/api/users', async (request, response) => {
 })
 
 if (existsSync(distPath)) {
+  app.get('/service-worker.js', (_request, response) => {
+    response.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+    response.sendFile(path.join(distPath, 'service-worker.js'))
+  })
   app.use(express.static(distPath))
   app.use((request, response, next) => {
     if (request.path.startsWith('/api')) {

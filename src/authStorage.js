@@ -10,6 +10,7 @@ import {
 
 export const AUTH_SESSION_KEY = 'gas-control-session-v1'
 export const AUTH_USERS_KEY = 'gas-control-users-v1'
+export const PENDING_SYNC_KEY = 'gas-control-pending-sync-v1'
 
 export const SUPER_ADMIN_EMAIL = 'admin@gas.local'
 export const SUPER_ADMIN_PASSWORD = 'admin123'
@@ -166,6 +167,33 @@ export function loadUsers() {
 
 export function saveUsers(users) {
   localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users))
+}
+
+export function loadPendingSync() {
+  try {
+    return JSON.parse(localStorage.getItem(PENDING_SYNC_KEY))
+  } catch {
+    return null
+  }
+}
+
+export function clearPendingSync() {
+  localStorage.removeItem(PENDING_SYNC_KEY)
+}
+
+export function queuePendingSync(reason = 'network-unavailable') {
+  const current = loadPendingSync()
+  localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify({
+    type: 'users-state',
+    reason,
+    queuedAt: current?.queuedAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    attempts: Number(current?.attempts || 0) + 1,
+  }))
+
+  if ('serviceWorker' in navigator) {
+    void navigator.serviceWorker.ready.then((registration) => registration.sync?.register('sync-operational-data')).catch(() => {})
+  }
 }
 
 export async function loadRemoteUsers() {

@@ -53,6 +53,8 @@ export default function ProfileSettingsFeature({
   onRestoreServer,
   installPromptAvailable,
   onRequestInstall,
+  updateAvailable,
+  onUpdateNow,
 }) {
   const [status, setStatus] = useState('')
   const [pendingImport, setPendingImport] = useState(null)
@@ -187,7 +189,7 @@ export default function ProfileSettingsFeature({
 
       <section className="settings-group application-settings">
         <div className="settings-group-heading"><div><span className="eyebrow">Aplicativo</span><h2>Instalação e permissões</h2></div></div>
-        <div className="application-facts"><article><span>Versão</span><strong>{APP_VERSION}</strong></article><article><span>Instalação</span><strong>{Capacitor.isNativePlatform() ? 'Aplicativo nativo' : standaloneMode ? 'PWA instalada' : 'Aberto no navegador'}</strong></article><article><span>Atualização</span><strong>{updateStatus}</strong></article><article><span>Notificações</span><strong>{notificationPermission}</strong></article></div>
+        <div className="application-facts"><article><span>Versão</span><strong>{APP_VERSION}</strong></article><article><span>Instalação</span><strong>{Capacitor.isNativePlatform() ? 'Aplicativo nativo' : standaloneMode ? 'PWA instalada' : 'Aberto no navegador'}</strong></article><article><span>Atualização</span><strong>{updateAvailable ? 'Atualização disponível' : updateStatus}</strong>{updateAvailable && <button type="button" className="compact-button" onClick={onUpdateNow}>Atualizar agora</button>}</article><article><span>Notificações</span><strong>{notificationPermission}</strong></article></div>
         {!Capacitor.isNativePlatform() && !standaloneMode && <div className="install-instructions"><div><strong>Instale para usar como aplicativo</strong><p>No iPhone, use Compartilhar → Adicionar à Tela de Início. No Android ou desktop, use a opção Instalar do navegador.</p></div><button type="button" className="primary" onClick={installApplication}>{installPromptAvailable ? 'Instalar aplicativo' : 'Ver como instalar'}</button></div>}
       </section>
 
