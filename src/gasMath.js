@@ -3,6 +3,7 @@ export const DEFAULT_CYCLE_DAYS = 35
 export const MOVING_AVERAGE_LIMIT = 3
 export const BUY_BUFFER_DAYS = 3
 export const GAS_REMINDER_NOTIFICATION_ID = 1301
+export const MAX_ANALYTICS_CYCLE_DAYS = 180
 
 export const GAS_BRANDS = [
   { id: 'ultragaz', name: 'Ultragaz' },
@@ -133,6 +134,29 @@ export function averageDuration(cycles) {
   return Math.round(cycles.reduce((sum, entry) => sum + entry.duration, 0) / cycles.length)
 }
 
+export function getAnalyticsHistoryAudit(history = []) {
+  const validCycles = []
+  const excludedCycles = []
+
+  history.forEach((entry) => {
+    const duration = Number(entry?.duration)
+    let reason = ''
+
+    if (!Number.isFinite(duration) || duration <= 0) {
+      reason = 'Duração inválida'
+    } else if (duration > MAX_ANALYTICS_CYCLE_DAYS) {
+      reason = `Duração acima de ${MAX_ANALYTICS_CYCLE_DAYS} dias`
+    } else if (entry.installedAt && entry.endedAt && daysBetween(entry.installedAt, entry.endedAt) !== duration) {
+      reason = 'Datas e duração inconsistentes'
+    }
+
+    if (reason) excludedCycles.push({ entry, reason })
+    else validCycles.push({ ...entry, duration })
+  })
+
+  return { validCycles, excludedCycles }
+}
+
 export function detectConsumptionPattern(history, movingAverage) {
   if (history.length < 4) {
     return {
@@ -237,7 +261,8 @@ export function calculateStats({ startedAt, today, projectedCycleDays }) {
 }
 
 export function calculateConsumptionStats(history = []) {
-  if (history.length === 0) {
+  const { validCycles } = getAnalyticsHistoryAudit(history)
+  if (validCycles.length === 0) {
     return {
       averageDuration: 0,
       shortestDuration: 0,
@@ -246,8 +271,8 @@ export function calculateConsumptionStats(history = []) {
     }
   }
 
-  const durations = history.map((entry) => entry.duration)
-  const average = averageDuration(history)
+  const durations = validCycles.map((entry) => entry.duration)
+  const average = averageDuration(validCycles)
 
   return {
     averageDuration: average,
@@ -258,7 +283,8 @@ export function calculateConsumptionStats(history = []) {
 }
 
 export function calculateFinancialStats(history = []) {
-  const paidValues = history
+  const { validCycles } = getAnalyticsHistoryAudit(history)
+  const paidValues = validCycles
     .map((entry) => Number(entry.paidValue))
     .filter((value) => Number.isFinite(value) && value > 0)
 
@@ -272,21 +298,24 @@ export function calculateFinancialStats(history = []) {
   }
 
   const averagePaid = paidValues.reduce((sum, value) => sum + value, 0) / paidValues.length
+  const averageCycleDuration = averageDuration(validCycles) || DEFAULT_CYCLE_DAYS
+  const annualCycles = 365 / averageCycleDuration
   const newestPrice = paidValues[0]
   const oldestPrice = paidValues[paidValues.length - 1]
 
   return {
     averagePaid,
-    monthlySpend: averagePaid / (DEFAULT_CYCLE_DAYS / 30),
-    annualSpend: averagePaid * (365 / DEFAULT_CYCLE_DAYS),
+    monthlySpend: (averagePaid * annualCycles) / 12,
+    annualSpend: averagePaid * annualCycles,
     priceDelta: newestPrice - oldestPrice,
   }
 }
 
 export function calculateBrandStats(history = []) {
+  const { validCycles } = getAnalyticsHistoryAudit(history)
   const brandMap = new Map()
 
-  history.forEach((entry) => {
+  validCycles.forEach((entry) => {
     const brandName = entry.brandName || DEFAULT_GAS_BRAND.name
     const current = brandMap.get(brandName) || {
       name: brandName,
@@ -329,11 +358,12 @@ export function calculateBrandStats(history = []) {
 }
 
 export function calculateTrendStats(history = []) {
-  const recentCycles = history.slice(0, 3)
-  const previousCycles = history.slice(3, 6)
+  const { validCycles } = getAnalyticsHistoryAudit(history)
+  const recentCycles = validCycles.slice(0, 3)
+  const previousCycles = validCycles.slice(3, 6)
   const recentAverage = averageDuration(recentCycles)
   const previousAverage = averageDuration(previousCycles)
-  const paidValues = history
+  const paidValues = validCycles
     .map((entry) => Number(entry.paidValue))
     .filter((value) => Number.isFinite(value) && value > 0)
   const newestPrice = paidValues[0] || 0

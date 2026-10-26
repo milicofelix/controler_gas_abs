@@ -4,15 +4,11 @@ import { Capacitor } from '@capacitor/core'
 import {
   GAS_REMINDER_NOTIFICATION_ID,
   averageDuration,
-  calculateBrandStats,
-  calculateConsumptionStats,
-  calculateFinancialStats,
-  calculateTrendStats,
   formatDateInput,
   formatDisplayDate,
-  formatMoney,
   getReminderDate,
   getSmartAlerts,
+  getAnalyticsHistoryAudit,
   normalizeBrand,
 } from '../gasMath.js'
 import { normalizeGasState } from '../authStorage.js'
@@ -27,7 +23,6 @@ import { readImageFile } from '../imageUpload.js'
 import { PAGE_OPTIONS, THEME_OPTIONS, getThemeOption } from '../appOptions.js'
 import {
   AppLogo,
-  BrandLogo,
   ProfileAvatar,
   cancelGasReminder,
 } from '../components/GasVisuals.jsx'
@@ -36,6 +31,7 @@ import DashboardFeature from './features/dashboard/DashboardFeature.jsx'
 import CylinderOperationsFeature from './features/cylinders/CylinderOperationsFeature.jsx'
 import HistoryTimelineFeature from './features/history/HistoryTimelineFeature.jsx'
 import AlertsCenterFeature from './features/alerts/AlertsCenterFeature.jsx'
+import AnalyticsFeature from './features/analytics/AnalyticsFeature.jsx'
 import { useOperationalNavigation } from './hooks/useOperationalNavigation.js'
 
 function isRunningStandalone() {
@@ -89,33 +85,16 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
   ), [hasActiveCylinder, state.inventory?.reserveAvailable, state.reminder?.enabled, state.reminder?.scheduledFor, stats])
 
   const pageTitle = PAGE_OPTIONS.find((page) => page.id === activePage)?.label || 'Início'
-  const brandStats = useMemo(() => calculateBrandStats(state.history), [state.history])
-  const bestBrand = brandStats[0] || null
-  const shortestBrand = brandStats.length > 0
-    ? brandStats.reduce((shortest, brand) => (
-        brand.averageDuration < shortest.averageDuration ? brand : shortest
-      ), brandStats[0])
-    : null
-  const maxBrandAverage = Math.max(1, ...brandStats.map((brand) => brand.averageDuration))
-  const consumptionStats = useMemo(() => calculateConsumptionStats(state.history), [state.history])
-  const financialStats = useMemo(() => calculateFinancialStats(state.history), [state.history])
-  const trendStats = useMemo(() => calculateTrendStats(state.history), [state.history])
-  const durationSeries = useMemo(() => state.history.slice(0, 6).reverse(), [state.history])
-  const maxDuration = Math.max(1, ...durationSeries.map((cycle) => cycle.duration))
-  const priceSeries = useMemo(() => state.history
-    .filter((cycle) => Number(cycle.paidValue) > 0)
-    .slice(0, 6)
-    .reverse(), [state.history])
-  const maxPrice = Math.max(1, ...priceSeries.map((cycle) => Number(cycle.paidValue)))
 
   const historyStats = useMemo(() => {
-    if (state.history.length === 0) {
+    const { validCycles } = getAnalyticsHistoryAudit(state.history)
+    if (validCycles.length === 0) {
       return { averageDuration: 0, totalCycles: 0 }
     }
 
     return {
-      averageDuration: averageDuration(state.history),
-      totalCycles: state.history.length,
+      averageDuration: averageDuration(validCycles),
+      totalCycles: validCycles.length,
     }
   }, [state.history])
 
@@ -536,157 +515,7 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
       )}
 
       {activePage === 'stats' && (
-        <>
-          <section className={`intelligence-card ${trendStats.consumptionTone}`}>
-            <div className="intelligence-header">
-              <div>
-                <span className="eyebrow">Inteligência estatística</span>
-                <h2>{trendStats.consumptionLabel}</h2>
-              </div>
-              <div className="intelligence-badge">
-                {trendStats.recentAverage ? `${trendStats.recentAverage} dias` : 'Sem amostra'}
-              </div>
-            </div>
-
-            <div className="trend-grid">
-              <article>
-                <span>Tendência de consumo</span>
-                <strong>{trendStats.consumptionMessage}</strong>
-              </article>
-              <article>
-                <span>Tendência de preço</span>
-                <strong>
-                  {trendStats.priceTrendLabel}
-                  {trendStats.priceDelta ? ` (${formatMoney(Math.abs(trendStats.priceDelta))})` : ''}
-                </strong>
-              </article>
-            </div>
-          </section>
-
-          <section className="metrics-grid stats-grid">
-            <article>
-              <span>Média geral</span>
-              <strong>{consumptionStats.averageDuration} dias</strong>
-            </article>
-            <article>
-              <span>Menor duração</span>
-              <strong>{consumptionStats.shortestDuration} dias</strong>
-            </article>
-            <article>
-              <span>Maior duração</span>
-              <strong>{consumptionStats.longestDuration} dias</strong>
-            </article>
-            <article>
-              <span>Consumo anual</span>
-              <strong>{consumptionStats.annualConsumption} botijões</strong>
-            </article>
-          </section>
-
-          <section className="metrics-grid stats-grid">
-            <article>
-              <span>Valor médio</span>
-              <strong>{financialStats.averagePaid ? formatMoney(financialStats.averagePaid) : 'R$ 0,00'}</strong>
-            </article>
-            <article>
-              <span>Gasto mensal</span>
-              <strong>{financialStats.monthlySpend ? formatMoney(financialStats.monthlySpend) : 'R$ 0,00'}</strong>
-            </article>
-            <article>
-              <span>Gasto anual</span>
-              <strong>{financialStats.annualSpend ? formatMoney(financialStats.annualSpend) : 'R$ 0,00'}</strong>
-            </article>
-            <article>
-              <span>Evolução</span>
-              <strong>{financialStats.priceDelta ? formatMoney(financialStats.priceDelta) : 'R$ 0,00'}</strong>
-            </article>
-          </section>
-
-          <section className="history-card">
-            <div className="history-header">
-              <div>
-                <span className="eyebrow">Gráficos</span>
-                <h2>Histórico de duração</h2>
-              </div>
-            </div>
-
-            <div className="chart-list">
-              {durationSeries.map((cycle) => (
-                <div key={cycle.id} className="chart-row">
-                  <span>{formatDisplayDate(cycle.endedAt)}</span>
-                  <div><i style={{ width: `${Math.max(8, (cycle.duration / maxDuration) * 100)}%` }}></i></div>
-                  <strong>{cycle.duration}d</strong>
-                </div>
-              ))}
-
-              {durationSeries.length === 0 && <div className="empty-state">Registre ciclos para ver o gráfico.</div>}
-            </div>
-          </section>
-
-          <section className="history-card">
-            <div className="history-header">
-              <div>
-                <span className="eyebrow">Custos</span>
-                <h2>Histórico de preços</h2>
-              </div>
-            </div>
-
-            <div className="chart-list price">
-              {priceSeries.map((cycle) => (
-                <div key={cycle.id} className="chart-row">
-                  <span>{formatDisplayDate(cycle.endedAt)}</span>
-                  <div><i style={{ width: `${Math.max(8, (Number(cycle.paidValue) / maxPrice) * 100)}%` }}></i></div>
-                  <strong>{formatMoney(cycle.paidValue)}</strong>
-                </div>
-              ))}
-
-              {priceSeries.length === 0 && <div className="empty-state">Informe valores pagos para ver a evolução.</div>}
-            </div>
-          </section>
-
-          <section className="history-card">
-            <div className="history-header">
-              <div>
-                <span className="eyebrow">Histórico por marca</span>
-                <h2>Média por marca</h2>
-              </div>
-            </div>
-
-            {brandStats.length > 0 && (
-              <div className="brand-highlight-grid">
-                <article className="positive">
-                  <span>Durou mais</span>
-                  <strong>{bestBrand.name}</strong>
-                  <small>{bestBrand.averageDuration} dias em média</small>
-                </article>
-                <article className="warning">
-                  <span>Durou menos</span>
-                  <strong>{shortestBrand.name}</strong>
-                  <small>{shortestBrand.averageDuration} dias em média</small>
-                </article>
-              </div>
-            )}
-
-            <div className="brand-ranking">
-              {brandStats.map((brand) => (
-                <article key={brand.name}>
-                  <BrandLogo brand={brand} />
-                  <div className="brand-ranking-content">
-                    <strong>{brand.name}</strong>
-                    <span>{brand.cycles} ciclos • último em {formatDisplayDate(brand.lastCycleEndedAt)}</span>
-                    <div className="brand-duration-bar">
-                      <i style={{ width: `${Math.max(10, (brand.averageDuration / maxBrandAverage) * 100)}%` }}></i>
-                    </div>
-                    <small>
-                      Média {brand.averageDuration} dias • menor {brand.shortestDuration} • maior {brand.longestDuration}
-                    </small>
-                  </div>
-                </article>
-              ))}
-
-              {brandStats.length === 0 && <div className="empty-state">Registre trocas para comparar marcas.</div>}
-            </div>
-          </section>
-        </>
+        <AnalyticsFeature history={state.history} />
       )}
 
       {activePage === 'profile' && (

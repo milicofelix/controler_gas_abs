@@ -5,11 +5,13 @@ import {
   calculateStats,
   detectConsumptionPattern,
   formatDateInput,
+  getAnalyticsHistoryAudit,
 } from './gasMath.js'
 import { normalizeGasState } from './authStorage.js'
 
 export function buildIntelligence(history = []) {
-  const recentCycles = history.slice(0, MOVING_AVERAGE_LIMIT)
+  const { validCycles, excludedCycles } = getAnalyticsHistoryAudit(history)
+  const recentCycles = validCycles.slice(0, MOVING_AVERAGE_LIMIT)
   const movingAverage = averageDuration(recentCycles)
   const projectedCycleDays = movingAverage || DEFAULT_CYCLE_DAYS
 
@@ -18,7 +20,8 @@ export function buildIntelligence(history = []) {
     movingAverage,
     isUsingRealAverage: movingAverage > 0,
     sampleSize: recentCycles.length,
-    pattern: detectConsumptionPattern(history, movingAverage),
+    excludedCycles: excludedCycles.length,
+    pattern: detectConsumptionPattern(validCycles, movingAverage),
   }
 }
 
