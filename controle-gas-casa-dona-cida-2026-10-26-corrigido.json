@@ -1,0 +1,129 @@
+{
+  "app": "Controle Gás",
+  "version": 2,
+  "exportedAt": "2026-10-26T04:26:24.550Z",
+  "user": {
+    "name": "Sr Melquiades",
+    "homeName": "Casa Dona Cida",
+    "email": "casa_donacida@gas.prod",
+    "theme": "blue-modern",
+    "residenceProfile": {
+      "city": "",
+      "state": "",
+      "whatsapp": "",
+      "avatar": "",
+      "updatedAt": "2026-06-29"
+    }
+  },
+  "data": {
+    "hasActiveCylinder": true,
+    "startedAt": "2026-10-23",
+    "cycleDays": 35,
+    "history": [
+      {
+        "id": "2026-10-23-2026-09-22-31-6e176b40-846b-407e-a9f4-1c7ebc81e4d9",
+        "installedAt": "2026-09-22",
+        "endedAt": "2026-10-23",
+        "duration": 31,
+        "paidValue": "",
+        "notes": "Troca pelo botijão reserva. Motivo: Gás acabou.",
+        "brandId": "ultragaz",
+        "brandName": "Ultragaz",
+        "brandLogo": ""
+      },
+      {
+        "id": "2026-09-22-2026-08-23-30-f9ba6405-27c6-422b-b749-dc98f1759224",
+        "installedAt": "2026-08-23",
+        "endedAt": "2026-09-22",
+        "duration": 30,
+        "paidValue": "115.00",
+        "notes": "Botijão reserva comprado em 16/07/2026. Troca pelo botijão reserva. Motivo: Gás acabou.",
+        "brandId": "ultragaz",
+        "brandName": "Ultragaz",
+        "brandLogo": ""
+      },
+      {
+        "id": "2026-08-23-2026-07-16-38-4344d907-af32-4896-9d41-bd2c1faac14c",
+        "installedAt": "2026-07-16",
+        "endedAt": "2026-08-23",
+        "duration": 38,
+        "paidValue": "115.00",
+        "notes": "Troca pelo botijão reserva. Motivo: Gás acabou.",
+        "brandId": "ultragaz",
+        "brandName": "Ultragaz",
+        "brandLogo": ""
+      }
+    ],
+    "manual": {
+      "installedAt": "2026-10-23",
+      "endedAt": "2026-10-23",
+      "paidValue": "115.00",
+      "notes": "Botijão reserva comprado em 01/09/2026."
+    },
+    "lastFinishedCycle": {
+      "id": "2026-10-23-2026-09-22-31-6e176b40-846b-407e-a9f4-1c7ebc81e4d9",
+      "installedAt": "2026-09-22",
+      "endedAt": "2026-10-23",
+      "duration": 31,
+      "paidValue": "",
+      "notes": "Troca pelo botijão reserva. Motivo: Gás acabou.",
+      "brandId": "ultragaz",
+      "brandName": "Ultragaz",
+      "brandLogo": ""
+    },
+    "reminder": {
+      "enabled": false,
+      "scheduledFor": ""
+    },
+    "currentBrand": {
+      "id": "ultragaz",
+      "name": "Ultragaz",
+      "logo": ""
+    },
+    "inventory": {
+      "reserveAvailable": false,
+      "reserveBrand": null,
+      "reservePurchasedAt": "",
+      "reservePaidValue": "",
+      "reserveId": ""
+    },
+    "reserveHistory": [
+      {
+        "id": "2026-09-01-ultragaz-dde8b06f-8366-44c3-94ad-e020b503648c",
+        "brandId": "ultragaz",
+        "brandName": "Ultragaz",
+        "brandLogo": "",
+        "purchasedAt": "2026-09-01",
+        "paidValue": "115.00",
+        "status": "used",
+        "usedAt": "2026-10-23",
+        "notes": "Usado como botijão principal. Motivo: Gás acabou.",
+        "createdAt": "2026-09-25"
+      },
+      {
+        "id": "2026-08-23-ultragaz-e2490727-8864-42c7-8d9f-b56f2e9afcf6",
+        "brandId": "ultragaz",
+        "brandName": "Ultragaz",
+        "brandLogo": "",
+        "purchasedAt": "2026-08-23",
+        "paidValue": "115.00",
+        "status": "used",
+        "usedAt": "2026-09-22",
+        "notes": "Usado como botijão principal. Motivo: Gás acabou.",
+        "createdAt": "2026-08-23"
+      },
+      {
+        "id": "2026-07-16-ultragaz-12c10aba-7504-43b3-be96-e5f284a31238",
+        "brandId": "ultragaz",
+        "brandName": "Ultragaz",
+        "brandLogo": "",
+        "purchasedAt": "2026-07-16",
+        "paidValue": "115.00",
+        "status": "used",
+        "usedAt": "2026-08-23",
+        "notes": "Usado como botijão principal. Motivo: Gás acabou.",
+        "createdAt": "2026-07-17"
+      }
+    ]
+  }
+}
