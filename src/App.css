@@ -882,6 +882,172 @@ button.ghost,
   }
 }
 
+/* PWA Fase 1 — dashboard operacional */
+.operational-dashboard {
+  padding-bottom: 8px;
+}
+
+.operational-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 14px 4px 0;
+  padding: 0 2px;
+}
+
+.operational-context > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.operational-context strong,
+.dashboard-section-heading strong {
+  color: var(--text-strong);
+  font-size: 16px;
+}
+
+.connection-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.connection-pill::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.connection-pill.online {
+  color: #15803d;
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.connection-pill.offline {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.dashboard-priority,
+.dashboard-actions {
+  margin-top: 16px;
+  border: 1px solid var(--card-border);
+  border-radius: 22px;
+  padding: 18px;
+  background: var(--card-bg);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.12);
+}
+
+.dashboard-priority {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.dashboard-priority.warning,
+.dashboard-priority.low {
+  border-color: rgba(245, 158, 11, 0.32);
+  background: color-mix(in srgb, var(--card-bg) 86%, rgba(245, 158, 11, 0.18));
+}
+
+.dashboard-priority.critical {
+  border-color: rgba(239, 68, 68, 0.38);
+  background: color-mix(in srgb, var(--card-bg) 84%, rgba(239, 68, 68, 0.2));
+}
+
+.dashboard-priority h2 {
+  margin: 5px 0 0;
+  color: var(--text-strong);
+  font-size: 19px;
+}
+
+.dashboard-priority p {
+  margin: 7px 0 0;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.dashboard-priority button {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.dashboard-actions {
+  display: grid;
+  gap: 14px;
+}
+
+.dashboard-section-heading {
+  display: grid;
+  gap: 5px;
+}
+
+.dashboard-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dashboard-action-grid button {
+  min-height: 52px;
+  padding: 8px 12px;
+  line-height: 1.2;
+}
+
+.dashboard-action-grid button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.dashboard-action-status {
+  margin: 0;
+  border-radius: 14px;
+  padding: 10px 12px;
+  color: var(--text-soft);
+  background: var(--surface-deep);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+}
+
+@media (min-width: 520px) {
+  .operational-context,
+  .dashboard-priority,
+  .dashboard-actions,
+  .operational-dashboard > .forecast-card,
+  .operational-dashboard > .home-secondary-grid {
+    margin-inline: 20px;
+  }
+}
+
+@media (max-width: 390px) {
+  .dashboard-priority {
+    display: grid;
+  }
+
+  .dashboard-priority button {
+    width: 100%;
+  }
+
+  .dashboard-action-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .stock-card.critical {
   border-color: rgba(239, 68, 68, 0.5);
   background: rgba(127, 29, 29, 0.3);

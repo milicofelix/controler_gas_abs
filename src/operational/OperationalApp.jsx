@@ -30,7 +30,7 @@ import {
 } from '../reserveHistory.js'
 import { replaceActiveCylinder } from '../gasStateTransitions.js'
 import { readImageFile } from '../imageUpload.js'
-import { PAGE_OPTIONS, STATUS_STEPS, THEME_OPTIONS, getThemeOption } from '../appOptions.js'
+import { PAGE_OPTIONS, THEME_OPTIONS, getThemeOption } from '../appOptions.js'
 import {
   AppLogo,
   BrandLogo,
@@ -39,6 +39,7 @@ import {
   cancelGasReminder,
 } from '../components/GasVisuals.jsx'
 import OperationalShell from './components/OperationalShell.jsx'
+import DashboardFeature from './features/dashboard/DashboardFeature.jsx'
 import { useOperationalNavigation } from './hooks/useOperationalNavigation.js'
 
 export default function OperationalApp({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout }) {
@@ -573,112 +574,18 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
       )}
 
       {activePage === 'home' && (
-        <>
-      <section className={`dashboard-card ${stats.status.tone}`}>
-        <div className="dashboard-decoration kitchen" aria-hidden="true">
-          <span></span><span></span><span></span>
-        </div>
-        <CylinderGauge percent={stats.percent} tone={stats.status.tone} />
-
-        <div className="reading-panel">
-          <span className="reading-label">Nível atual</span>
-          <strong>{stats.percent}%</strong>
-          <div className={`mini-level ${stats.status.tone}`}>☻ Nível: {stats.status.label}</div>
-          <p>
-            {!hasActiveCylinder
-              ? 'Cadastre a instalação para iniciar o acompanhamento'
-              : intelligence.isUsingRealAverage
-              ? 'Estimativa baseada no seu consumo médio'
-              : 'Estimativa baseada em consumo inicial'}
-          </p>
-
-          <div className={`progress-track ${stats.status.tone}`}>
-            <span style={{ width: `${stats.percent}%` }}></span>
-          </div>
-
-          <div className="state-scale" aria-label="Estados visuais do botijão">
-            {STATUS_STEPS.map((step) => (
-              <span
-                key={step.tone}
-                className={`${step.tone}${stats.status.tone === step.tone ? ' active' : ''}`}
-              >
-                {step.label}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="metrics-grid">
-        <article>
-          <span>Dias de uso</span>
-          <strong>{hasActiveCylinder ? stats.elapsedDays : '-'}</strong>
-        </article>
-        <article>
-          <span>Dias restantes</span>
-          <strong>{hasActiveCylinder ? stats.remainingDays : '-'}</strong>
-        </article>
-        <article>
-          <span>Média de consumo</span>
-          <strong>{intelligence.projectedCycleDays}</strong>
-          <small>dias/botijão</small>
-        </article>
-      </section>
-
-      <section className="forecast-card">
-        <div>
-          <span className="eyebrow">Previsão de término</span>
-          <h2>{hasActiveCylinder ? formatDisplayDate(stats.expectedEnd) : 'Sem previsão'}</h2>
-          <p>{hasActiveCylinder ? `Em ~${stats.remainingDays} dias` : 'Informe a data de instalação'}</p>
-        </div>
-        <div className={`forecast-ring ${stats.status.tone}`} style={{ '--gas-progress': stats.percent }} aria-hidden="true">
-          <span>▣</span>
-        </div>
-      </section>
-
-      {!hasActiveCylinder && (
-        <section className="quick-actions-card">
-          <button type="button" className="primary register-main-button" onClick={() => setActivePage('stock')}>
-            Iniciar controle do botijão
-          </button>
-        </section>
-      )}
-
-      <section className="home-secondary-grid">
-        <article className="brand-dashboard-card">
-          <div>
-            <span className="eyebrow">Botijão atual</span>
-            <h2>{currentBrand.name}</h2>
-            <p>
-              {hasActiveCylinder ? `Compra: ${formatDisplayDate(state.startedAt)}` : 'Nenhum botijão em uso'}
-            </p>
-          </div>
-          <BrandLogo brand={currentBrand} />
-        </article>
-
-        <article className={`stock-card reserve-card ${state.inventory?.reserveAvailable ? 'available' : ''}`}>
-          <div>
-            <span className="eyebrow">Reserva</span>
-            <h2>{state.inventory?.reserveAvailable ? 'Disponível' : 'Sem reserva'}</h2>
-            <p>
-              {state.inventory?.reserveAvailable
-                ? `Pronto para troca${state.inventory.reserveBrand?.name ? ` • ${state.inventory.reserveBrand.name}` : ''}.`
-                : 'Cadastre se tiver dois botijões.'}
-            </p>
-          </div>
-          <div className="reserve-actions">
-            {state.inventory?.reserveAvailable && (
-              <button type="button" className="ghost compact-button" onClick={requestUseReserveCylinder}>
-                Usar reserva
-              </button>
-            )}
-            <button type="button" className="primary compact-button" onClick={() => setActivePage('stock')}>
-              Gerenciar
-            </button>
-          </div>
-        </article>
-      </section>
-        </>
+        <DashboardFeature
+          state={state}
+          stats={stats}
+          intelligence={intelligence}
+          currentBrand={currentBrand}
+          hasActiveCylinder={hasActiveCylinder}
+          primaryAlert={smartAlerts[0]}
+          notificationStatus={notificationStatus}
+          onNavigate={setActivePage}
+          onUseReserve={requestUseReserveCylinder}
+          onScheduleReminder={scheduleBuyReminder}
+        />
       )}
 
       {activePage === 'stock' && (
