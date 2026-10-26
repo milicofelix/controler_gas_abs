@@ -52,10 +52,13 @@ export function normalizeGasState(nextState, today = formatDateInput(new Date())
 
   return {
     hasActiveCylinder,
-    startedAt: hasActiveCylinder ? (restoredManual.installedAt || restoredStartedAt) : restoredStartedAt,
+    startedAt: restoredStartedAt,
     cycleDays: DEFAULT_CYCLE_DAYS,
     history: normalizeHistory(nextState?.history),
-    manual: restoredManual,
+    manual: {
+      ...restoredManual,
+      installedAt: hasActiveCylinder ? restoredStartedAt : restoredManual.installedAt,
+    },
     lastFinishedCycle: nextState?.lastFinishedCycle || null,
     reminder: nextState?.reminder || { enabled: false, scheduledFor: '' },
     currentBrand: normalizeBrand(nextState?.currentBrand),

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   createReserveHistoryEntry,
+  getReserveReasonText,
   getReserveStatusLabel,
   updateReserveHistoryStatus,
 } from './reserveHistory.js'
@@ -58,4 +59,13 @@ test('traduz status conhecido e usa fallback para status desconhecido', () => {
   assert.equal(getReserveStatusLabel('removed'), 'Removido')
   assert.equal(getReserveStatusLabel('replaced'), 'Substituído')
   assert.equal(getReserveStatusLabel('audit'), 'Registrado')
+})
+
+test('traduz motivos de uso do reserva para texto de historico', () => {
+  assert.equal(getReserveReasonText('acabou'), 'Gás acabou.')
+  assert.equal(getReserveReasonText('vazamento'), 'Suspeita de vazamento.')
+  assert.equal(getReserveReasonText('preventivo'), 'Troca preventiva.')
+  assert.equal(getReserveReasonText('outro', '  Regulador com defeito  '), 'Regulador com defeito')
+  assert.equal(getReserveReasonText('outro', '   '), 'Outro motivo informado.')
+  assert.equal(getReserveReasonText('desconhecido'), 'Outro motivo informado.')
 })

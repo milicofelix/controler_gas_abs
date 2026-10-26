@@ -39,6 +39,17 @@ export function updateReserveHistoryStatus(history = [], reserveId, status, extr
   ))
 }
 
+export function getReserveReasonText(reason, notes = '') {
+  const reasonLabels = {
+    acabou: 'Gás acabou.',
+    vazamento: 'Suspeita de vazamento.',
+    preventivo: 'Troca preventiva.',
+    outro: notes.trim() || 'Outro motivo informado.',
+  }
+
+  return reasonLabels[reason] || reasonLabels.outro
+}
+
 export function getReserveStatusLabel(status) {
   const statusLabels = {
     available: 'Disponível',

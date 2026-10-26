@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import {
-  DEFAULT_CYCLE_DAYS,
   DEFAULT_GAS_BRAND,
   GAS_REMINDER_NOTIFICATION_ID,
   GAS_BRANDS,
@@ -10,9 +9,7 @@ import {
   calculateConsumptionStats,
   calculateFinancialStats,
   calculateTrendStats,
-  createHistoryEntry,
   createManualFields,
-  daysBetween,
   formatDateInput,
   formatDisplayDate,
   formatMoney,
@@ -47,9 +44,11 @@ import {
 } from './whatsappStatus'
 import {
   createReserveHistoryEntry,
+  getReserveReasonText,
   getReserveStatusLabel,
   updateReserveHistoryStatus,
 } from './reserveHistory'
+import { replaceActiveCylinder } from './gasStateTransitions'
 import { readImageFile } from './imageUpload'
 import { PAGE_OPTIONS, STATUS_STEPS, THEME_OPTIONS, getThemeOption } from './appOptions'
 import './App.css'
@@ -488,6 +487,8 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
   const [notificationStatus, setNotificationStatus] = useState('')
   const [settingsStatus, setSettingsStatus] = useState('')
   const [brandUploadStatus, setBrandUploadStatus] = useState('')
+  const [cycleOperationStatus, setCycleOperationStatus] = useState('')
+  const replacementLockRef = useRef(false)
   const [profileForm, setProfileForm] = useState(() => ({
     name: currentUser.name || '',
     homeName: currentUser.homeName || '',
@@ -742,19 +743,9 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
     }))
   }
 
-  function getReserveReasonText(reason, notes = '') {
-    const reasonLabels = {
-      acabou: 'Gás acabou.',
-      vazamento: 'Suspeita de vazamento.',
-      preventivo: 'Troca preventiva.',
-      outro: notes.trim() || 'Outro motivo informado.',
-    }
-
-    return reasonLabels[reason] || reasonLabels.outro
-  }
-
   function requestUseReserveCylinder() {
-    setReserveSwitchDate(state.manual?.endedAt || today)
+    const manualEndedAt = state.manual?.endedAt
+    setReserveSwitchDate(manualEndedAt && manualEndedAt > state.startedAt ? manualEndedAt : today)
     setReserveConfirmationOpen(true)
   }
 
@@ -763,7 +754,9 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
     const reasonText = getReserveReasonText(reserveReason, reserveReasonNotes)
     const switchedAt = reserveSwitchDate || today
 
-    applyReserveCylinder(reasonText, switchedAt)
+    const result = applyReserveCylinder(reasonText, switchedAt)
+    if (!result.ok) return
+
     setReserveConfirmationOpen(false)
     setReserveReason('acabou')
     setReserveReasonNotes('')
@@ -771,51 +764,34 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
   }
 
   function applyReserveCylinder(reasonText, switchedAt = today) {
-    const reserveBrand = state.inventory?.reserveBrand
-      ? normalizeBrand(state.inventory.reserveBrand)
-      : currentBrand
-    const lastFinishedCycle = hasActiveCylinder
-      ? createHistoryEntry({
-          installedAt: state.startedAt,
-          endedAt: switchedAt,
-          duration: Math.max(1, daysBetween(state.startedAt, switchedAt)),
-          paidValue: state.manual?.paidValue || '',
-          notes: [state.manual?.notes, `Troca pelo botijão reserva. Motivo: ${reasonText}`].filter(Boolean).join(' '),
-          brand: currentBrand,
-        })
-      : null
-    const nextHistory = lastFinishedCycle ? [lastFinishedCycle, ...state.history].slice(0, 8) : state.history
+    return performCylinderReplacement({
+      endedAt: switchedAt,
+      source: 'reserve',
+      reasonText,
+    })
+  }
 
-    setState((current) => ({
-      ...current,
-      hasActiveCylinder: true,
-      startedAt: switchedAt,
-      history: nextHistory,
-      lastFinishedCycle,
-      currentBrand: reserveBrand,
-      inventory: {
-        reserveAvailable: false,
-        reserveBrand: null,
-        reservePurchasedAt: '',
-        reservePaidValue: '',
-        reserveId: '',
-      },
-      reserveHistory: updateReserveHistoryStatus(current.reserveHistory, state.inventory?.reserveId, 'used', {
-        usedAt: switchedAt,
-        notes: `Usado como botijão principal. Motivo: ${reasonText}`,
-      }),
-      manual: createManualFields({
-        startedAt: switchedAt,
-        endedAt: switchedAt,
-        paidValue: state.inventory?.reservePaidValue || '',
-        notes: state.inventory?.reservePurchasedAt
-          ? `Botijão reserva comprado em ${formatDisplayDate(state.inventory.reservePurchasedAt)}.`
-          : '',
-      }),
-      reminder: { enabled: false, scheduledFor: '' },
-    }))
+  function performCylinderReplacement(options) {
+    if (replacementLockRef.current) {
+      const result = { ok: false, message: 'A troca já está sendo processada.' }
+      setCycleOperationStatus(result.message)
+      return result
+    }
 
-    void cancelGasReminder()
+    replacementLockRef.current = true
+    const result = replaceActiveCylinder(state, options)
+    setCycleOperationStatus(result.message)
+
+    if (result.ok) {
+      setState(result.state)
+      void cancelGasReminder()
+    }
+
+    queueMicrotask(() => {
+      replacementLockRef.current = false
+    })
+
+    return result
   }
 
   function updateManualField(field, value) {
@@ -849,32 +825,10 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
       return
     }
 
-    const endedAt = state.manual?.endedAt || today
-    const duration = Math.max(1, daysBetween(state.startedAt, endedAt))
-    const lastFinishedCycle = createHistoryEntry({
-      installedAt: state.startedAt,
-      endedAt,
-      duration,
-      paidValue: state.manual?.paidValue || '',
-      notes: state.manual?.notes || '',
-      brand: currentBrand,
+    performCylinderReplacement({
+      endedAt: state.manual?.endedAt || today,
+      source: 'manual',
     })
-    const nextHistory = [lastFinishedCycle, ...state.history].slice(0, 8)
-
-    setState({
-      hasActiveCylinder: true,
-      startedAt: endedAt,
-      cycleDays: DEFAULT_CYCLE_DAYS,
-      history: nextHistory,
-      manual: createManualFields({ startedAt: endedAt, endedAt }),
-      lastFinishedCycle,
-      currentBrand,
-      inventory: state.inventory || { reserveAvailable: false, reserveBrand: null },
-      reserveHistory: state.reserveHistory || [],
-      reminder: { enabled: false, scheduledFor: '' },
-    })
-
-    void cancelGasReminder()
   }
 
   function requestResetDemo() {
@@ -1337,6 +1291,12 @@ function UserHome({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdat
             </button>
             <button type="button" className="ghost" onClick={requestResetDemo}>Resetar</button>
           </div>
+
+          {cycleOperationStatus && (
+            <div className="cycle-feedback" role="status">
+              {cycleOperationStatus}
+            </div>
+          )}
 
           {state.lastFinishedCycle && (
             <div className="cycle-feedback" role="status">
