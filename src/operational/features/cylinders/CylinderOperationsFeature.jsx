@@ -106,6 +106,7 @@ export default function CylinderOperationsFeature({
     }
 
     if (initialIntent === 'start' && !hasActiveCylinder) setJourney('start')
+    if (initialIntent === 'reserve') setJourney('reserve')
     onIntentHandled()
   }, [hasActiveCylinder, initialIntent, onIntentHandled, reserveAvailable, today])
 

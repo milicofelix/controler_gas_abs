@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { LocalNotifications } from '@capacitor/local-notifications'
+import { Capacitor } from '@capacitor/core'
 import {
   GAS_REMINDER_NOTIFICATION_ID,
   averageDuration,
@@ -10,7 +11,6 @@ import {
   formatDateInput,
   formatDisplayDate,
   formatMoney,
-  getAlert,
   getReminderDate,
   getSmartAlerts,
   normalizeBrand,
@@ -35,16 +35,18 @@ import OperationalShell from './components/OperationalShell.jsx'
 import DashboardFeature from './features/dashboard/DashboardFeature.jsx'
 import CylinderOperationsFeature from './features/cylinders/CylinderOperationsFeature.jsx'
 import HistoryTimelineFeature from './features/history/HistoryTimelineFeature.jsx'
+import AlertsCenterFeature from './features/alerts/AlertsCenterFeature.jsx'
 import { useOperationalNavigation } from './hooks/useOperationalNavigation.js'
 
 function isRunningStandalone() {
   return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
 }
 
-export default function OperationalApp({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout }) {
+export default function OperationalApp({ currentUser, onUpdateUserState, onUpdateUserProfile, onUpdateUserTheme, onLogout, storageStatus }) {
   const { activePage, navigate: setActivePage } = useOperationalNavigation(PAGE_OPTIONS)
   const [state, setState] = useState(() => normalizeGasState(currentUser.state))
   const [stockIntent, setStockIntent] = useState('')
+  const [alertsIntent, setAlertsIntent] = useState('')
   const [notificationStatus, setNotificationStatus] = useState('')
   const [settingsStatus, setSettingsStatus] = useState('')
   const [standaloneMode, setStandaloneMode] = useState(isRunningStandalone)
@@ -71,7 +73,6 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
     getUserStats({ state }, today).stats
   ), [state, today])
 
-  const visualAlert = hasActiveCylinder ? getAlert(stats.percent) : null
   const smartAlerts = useMemo(() => (
     hasActiveCylinder
       ? getSmartAlerts({
@@ -192,6 +193,16 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
   function requestUseReserveCylinder() {
     setStockIntent('replace-reserve')
     setActivePage('stock')
+  }
+
+  function requestRegisterReserve() {
+    setStockIntent('reserve')
+    setActivePage('stock')
+  }
+
+  function requestReminderFlow() {
+    setAlertsIntent('reminder')
+    setActivePage('alerts')
   }
 
   function startControl(input) {
@@ -348,32 +359,39 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
     setNotificationStatus('Configurando lembrete...')
 
     try {
-      const currentPermission = await LocalNotifications.checkPermissions()
-      const permission = currentPermission.display === 'granted'
-        ? currentPermission
-        : await LocalNotifications.requestPermissions()
-
-      if (permission.display !== 'granted') {
-        setNotificationStatus('Permissão de notificações não concedida.')
-        return
-      }
-
       const reminderDate = getReminderDate(today, stats.buyInDays)
+      let statusMessage = ''
 
-      await LocalNotifications.cancel({
-        notifications: [{ id: GAS_REMINDER_NOTIFICATION_ID }],
-      })
+      if (Capacitor.isNativePlatform()) {
+        const currentPermission = await LocalNotifications.checkPermissions()
+        const permission = currentPermission.display === 'granted'
+          ? currentPermission
+          : await LocalNotifications.requestPermissions()
 
-      await LocalNotifications.schedule({
-        notifications: [
-          {
-            id: GAS_REMINDER_NOTIFICATION_ID,
-            title: 'Comprar gás',
-            body: `Seu botijão está previsto para acabar em ${formatDisplayDate(stats.expectedEnd)}.`,
-            schedule: { at: reminderDate },
-          },
-        ],
-      })
+        if (permission.display === 'granted') {
+          await LocalNotifications.cancel({ notifications: [{ id: GAS_REMINDER_NOTIFICATION_ID }] })
+          await LocalNotifications.schedule({
+            notifications: [{
+              id: GAS_REMINDER_NOTIFICATION_ID,
+              title: 'Comprar gás',
+              body: `Seu botijão está previsto para acabar em ${formatDisplayDate(stats.expectedEnd)}.`,
+              schedule: { at: reminderDate },
+            }],
+          })
+          statusMessage = `Notificação e lembrete visual ativos para ${formatDisplayDate(formatDateInput(reminderDate))}.`
+        } else {
+          statusMessage = 'Permissão negada. O lembrete visual continuará ativo nesta central.'
+        }
+      } else if ('Notification' in window) {
+        const permission = window.Notification.permission === 'default'
+          ? await window.Notification.requestPermission()
+          : window.Notification.permission
+        statusMessage = permission === 'granted'
+          ? 'Permissão concedida. Neste navegador, o lembrete visual permanecerá como alternativa principal.'
+          : 'Permissão negada. O lembrete visual continuará ativo nesta central.'
+      } else {
+        statusMessage = 'Notificações do sistema não são suportadas aqui. O lembrete visual foi ativado.'
+      }
 
       setState((current) => ({
         ...current,
@@ -382,23 +400,29 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
           scheduledFor: formatDateInput(reminderDate),
         },
       }))
-      setNotificationStatus(`Lembrete ativo para ${formatDisplayDate(formatDateInput(reminderDate))}.`)
+      setNotificationStatus(statusMessage)
     } catch {
-      setNotificationStatus('Notificações locais não estão disponíveis neste ambiente.')
+      const reminderDate = getReminderDate(today, stats.buyInDays)
+      setState((current) => ({
+        ...current,
+        reminder: { enabled: true, scheduledFor: formatDateInput(reminderDate) },
+      }))
+      setNotificationStatus('Não foi possível ativar a notificação do sistema. O lembrete visual foi mantido.')
     }
   }
 
   async function disableBuyReminder() {
+    let statusMessage = 'Lembrete cancelado.'
     try {
-      await cancelGasReminder()
-      setState((current) => ({
-        ...current,
-        reminder: { enabled: false, scheduledFor: '' },
-      }))
-      setNotificationStatus('Lembrete cancelado.')
+      if (Capacitor.isNativePlatform()) await cancelGasReminder()
     } catch {
-      setNotificationStatus('Não foi possível cancelar o lembrete neste ambiente.')
+      statusMessage = 'A notificação do sistema pode continuar ativa, mas o lembrete visual foi cancelado.'
     }
+    setState((current) => ({
+      ...current,
+      reminder: { enabled: false, scheduledFor: '' },
+    }))
+    setNotificationStatus(statusMessage)
   }
 
   return (
@@ -466,7 +490,7 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
           notificationStatus={notificationStatus}
           onNavigate={setActivePage}
           onUseReserve={requestUseReserveCylinder}
-          onScheduleReminder={scheduleBuyReminder}
+          onScheduleReminder={requestReminderFlow}
         />
       )}
 
@@ -487,106 +511,20 @@ export default function OperationalApp({ currentUser, onUpdateUserState, onUpdat
       )}
 
       {activePage === 'alerts' && (
-        <>
-      <section className="alert-summary-grid">
-        <article className={stats.buyInDays <= 7 ? 'low' : 'stable'}>
-          <span>Comprar</span>
-          <strong>{stats.recommendation}</strong>
-        </article>
-        <article className={stats.percent <= 10 ? 'critical' : 'stable'}>
-          <span>Estoque</span>
-          <strong>{!hasActiveCylinder ? 'Sem botijão' : stats.percent <= 10 ? 'Crítico' : state.inventory?.reserveAvailable ? 'Reserva ativa' : 'Monitorado'}</strong>
-        </article>
-        <article>
-          <span>Termina</span>
-          <strong>{hasActiveCylinder ? formatDisplayDate(stats.expectedEnd) : 'Sem previsão'}</strong>
-        </article>
-        <article className={state.reminder?.enabled ? 'stable' : ''}>
-          <span>Lembrete</span>
-          <strong>{state.reminder?.enabled ? formatDisplayDate(state.reminder.scheduledFor) : 'Inativo'}</strong>
-        </article>
-      </section>
-
-      <section className="smart-alert-list">
-        {smartAlerts.map((alert) => (
-          <article key={alert.title} className={`alert-card ${alert.tone}`}>
-            <div>
-              <span className="eyebrow">Alerta inteligente</span>
-              <h2>{alert.title}</h2>
-              <p>{alert.message}</p>
-            </div>
-          </article>
-        ))}
-      </section>
-
-      {!visualAlert && (
-        <section className="alert-card ok">
-          <div>
-            <span className="eyebrow">Alertas</span>
-            <h2>{hasActiveCylinder ? 'Nenhum alerta crítico agora' : 'Nenhum botijão em uso'}</h2>
-            <p>
-              {hasActiveCylinder
-                ? 'O botijão está dentro do nível esperado. Você ainda pode ativar o lembrete de compra.'
-                : 'Cadastre a data de instalação para habilitar alertas e previsão de término.'}
-            </p>
-          </div>
-        </section>
-      )}
-
-      {hasActiveCylinder && state.inventory?.reserveAvailable && stats.percent <= 10 && (
-        <section className="stock-card critical">
-          <div>
-            <span className="eyebrow">Ação recomendada</span>
-            <h2>Troque pelo reserva</h2>
-            <p>Depois da troca, compre um novo botijão para voltar a ter estoque de segurança.</p>
-          </div>
-          <button type="button" className="primary" onClick={requestUseReserveCylinder}>
-            Trocar pelo reserva
-          </button>
-        </section>
-      )}
-
-      <section className={`intelligence-card ${intelligence.pattern.tone}`}>
-        <div className="intelligence-header">
-          <div>
-            <span className="eyebrow">Lembrete</span>
-          <h2>{stats.recommendation}</h2>
-          </div>
-          <div className="intelligence-badge">
-            {intelligence.isUsingRealAverage ? 'Média real' : 'Base inicial'}
-          </div>
-        </div>
-
-        <div className="intelligence-grid">
-          <article>
-            <span>Comprar em</span>
-            <strong>{hasActiveCylinder ? `${stats.buyInDays} dias` : '-'}</strong>
-          </article>
-          <article>
-            <span>Previsão</span>
-            <strong>{hasActiveCylinder ? formatDisplayDate(stats.expectedEnd) : 'Sem previsão'}</strong>
-          </article>
-        </div>
-
-        <div className="reminder-actions">
-          <button type="button" className="primary" onClick={scheduleBuyReminder}>
-            {state.reminder?.enabled ? 'Reagendar lembrete' : 'Ativar lembrete de compra'}
-          </button>
-
-          {state.reminder?.enabled && (
-            <button type="button" className="ghost" onClick={disableBuyReminder}>
-              Cancelar lembrete
-            </button>
-          )}
-
-          {(notificationStatus || state.reminder?.enabled) && (
-            <span>
-              {notificationStatus || `Lembrete ativo para ${formatDisplayDate(state.reminder.scheduledFor)}.`}
-            </span>
-          )}
-        </div>
-      </section>
-        </>
+        <AlertsCenterFeature
+          state={state}
+          stats={stats}
+          hasActiveCylinder={hasActiveCylinder}
+          storageStatus={storageStatus}
+          notificationStatus={notificationStatus}
+          initialIntent={alertsIntent}
+          onIntentHandled={() => setAlertsIntent('')}
+          onRegisterReserve={requestRegisterReserve}
+          onUseReserve={requestUseReserveCylinder}
+          onOpenOperation={() => setActivePage('stock')}
+          onActivateReminder={scheduleBuyReminder}
+          onCancelReminder={disableBuyReminder}
+        />
       )}
 
       {activePage === 'history' && (

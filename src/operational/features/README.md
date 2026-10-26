@@ -5,7 +5,7 @@ Esta pasta receberá as telas do PWA por domínio, sem mover regras de negócio 
 - `dashboard`: visão inicial e atalhos.
 - `cylinders`: botijão atual, troca e reserva.
 - `history`: linha do tempo consolidada de ciclos e movimentações (implementado).
-- `alerts`: alertas e lembretes.
+- `alerts`: central de alertas acionáveis e lembretes (implementado).
 - `analytics`: indicadores e gráficos.
 - `profile`: residência, preferências e backup.
 

@@ -19,7 +19,7 @@ import './App.css'
 function App() {
   const [users, setUsers] = useState(loadUsers)
   const [session, setSession] = useState(loadSession)
-  const [, setStorageStatus] = useState('Sincronizando com MySQL...')
+  const [storageStatus, setStorageStatus] = useState('Sincronizando com MySQL...')
   const [remoteReady, setRemoteReady] = useState(false)
   const saveTimerRef = useRef(null)
 
@@ -172,6 +172,7 @@ function App() {
       onUpdateUserProfile={updateUserProfile}
       onUpdateUserTheme={updateUserTheme}
       onLogout={logout}
+      storageStatus={storageStatus}
     />
   )
 }
