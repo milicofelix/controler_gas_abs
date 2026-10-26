@@ -1,52 +1,38 @@
 {
-  "name": "Controle Gas",
-  "short_name": "Gas",
-  "start_url": "/",
+  "id": "/",
+  "name": "Meu Gás — Controle de Botijões",
+  "short_name": "Meu Gás",
+  "description": "Acompanhe o botijão em uso, reservas, trocas, consumo, alertas e lembretes da residência.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "/?source=pwa#home",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#101827",
-  "theme_color": "#ef4444",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#f1f5f9",
+  "theme_color": "#2563eb",
+  "categories": ["utilities", "lifestyle", "productivity"],
+  "prefer_related_applications": false,
   "icons": [
-    {
-      "src": "/icons/icon-48.webp",
-      "type": "image/webp",
-      "sizes": "48x48",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/icon-72.webp",
-      "type": "image/webp",
-      "sizes": "72x72",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/icon-96.webp",
-      "type": "image/webp",
-      "sizes": "96x96",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/icon-128.webp",
-      "type": "image/webp",
-      "sizes": "128x128",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/icon-192.webp",
-      "type": "image/webp",
-      "sizes": "192x192",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/icon-256.webp",
-      "type": "image/webp",
-      "sizes": "256x256",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/icons/icon-512.webp",
-      "type": "image/webp",
-      "sizes": "512x512",
-      "purpose": "any maskable"
-    }
+    { "src": "/icons/icon-48.webp", "sizes": "48x48", "type": "image/webp", "purpose": "any" },
+    { "src": "/icons/icon-72.webp", "sizes": "72x72", "type": "image/webp", "purpose": "any" },
+    { "src": "/icons/icon-96.webp", "sizes": "96x96", "type": "image/webp", "purpose": "any" },
+    { "src": "/icons/icon-128.webp", "sizes": "128x128", "type": "image/webp", "purpose": "any" },
+    { "src": "/icons/icon-192.webp", "sizes": "192x192", "type": "image/webp", "purpose": "any" },
+    { "src": "/icons/icon-256.webp", "sizes": "256x256", "type": "image/webp", "purpose": "any" },
+    { "src": "/icons/icon-512.webp", "sizes": "512x512", "type": "image/webp", "purpose": "any" },
+    { "src": "/icons/icon-192.webp", "sizes": "192x192", "type": "image/webp", "purpose": "maskable" },
+    { "src": "/icons/icon-512.webp", "sizes": "512x512", "type": "image/webp", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    { "src": "/screenshots/dashboard-mobile.svg", "sizes": "390x844", "type": "image/svg+xml", "form_factor": "narrow", "label": "Dashboard operacional do Meu Gás" },
+    { "src": "/screenshots/dashboard-wide.svg", "sizes": "1280x720", "type": "image/svg+xml", "form_factor": "wide", "label": "Indicadores e operações do Meu Gás" }
+  ],
+  "shortcuts": [
+    { "name": "Trocar botijão", "short_name": "Trocar", "description": "Abrir a jornada de troca", "url": "/?action=replace#stock", "icons": [{ "src": "/icons/icon-96.webp", "sizes": "96x96", "type": "image/webp" }] },
+    { "name": "Usar reserva", "short_name": "Usar reserva", "description": "Trocar pelo botijão reserva", "url": "/?action=replace-reserve#stock", "icons": [{ "src": "/icons/icon-96.webp", "sizes": "96x96", "type": "image/webp" }] },
+    { "name": "Cadastrar reserva", "short_name": "Nova reserva", "description": "Cadastrar um botijão reserva", "url": "/?action=reserve#stock", "icons": [{ "src": "/icons/icon-96.webp", "sizes": "96x96", "type": "image/webp" }] },
+    { "name": "Ver alertas", "short_name": "Alertas", "description": "Abrir a central de alertas", "url": "/#alerts", "icons": [{ "src": "/icons/icon-96.webp", "sizes": "96x96", "type": "image/webp" }] }
   ]
 }
